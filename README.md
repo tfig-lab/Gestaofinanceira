@@ -5,7 +5,7 @@ Painel em uma única página (HTML + JavaScript, sem servidor) para acompanhar a
 ## O que calcula
 
 - **Receita** = charge-out rate × horas × **realização** (%, informada por projeto)
-- **Saldo líquido** = valor final do projeto (líquido, ou bruto − impostos) − receita (− despesas, se marcado)
+- **Saldo líquido** = valor líquido do projeto − receita (− despesas, se marcado)
 - **Disponível por mês** até a data limite, em R$ de receita, em R$ a tabela e em horas aproximadas
 - Horas e receita por profissional (total e por mês), com os BOTs agrupados numa linha só
 - Despesas por mês, por tipo e por profissional, com uma descrição de cada tipo
@@ -14,7 +14,7 @@ Painel em uma única página (HTML + JavaScript, sem servidor) para acompanhar a
 
 1. Abra a página (GitHub Pages ou `index.html` direto no navegador).
 2. **Importar planilha**: escolha o .xls/.xlsx exportado. Cada engagement vira um card.
-3. Os parâmetros dos projetos já cadastrados (realização, valor final, imposto e data limite) ficam fixos no código, em `DEFAULTS` no `index.html`.
+3. Os parâmetros dos projetos já cadastrados (realização, valor líquido e data limite) ficam fixos no código, em `DEFAULTS` no `index.html`. Todos os valores do painel são líquidos de impostos.
 4. Para um projeto novo, preencha os parâmetros no painel à esquerda. Eles ficam salvos neste navegador.
 
 ## Publicar no GitHub Pages
