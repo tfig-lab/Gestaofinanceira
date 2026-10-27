@@ -64,8 +64,8 @@ input[type=file]{display:none}
 .drop.over{border-color:var(--accent);background:var(--soft)}
 
 /* grade */
-.dash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.dash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:16px 18px;display:flex;flex-direction:column;gap:14px;min-width:0}
 .c12{grid-column:span 12} .c8{grid-column:span 8} .c7{grid-column:span 7} .c6{grid-column:span 6} .c5{grid-column:span 5} .c4{grid-column:span 4} .c3{grid-column:span 3}
 @media (max-width:1180px){.c8,.c7,.c5,.c4{grid-column:span 12} .c3{grid-column:span 6}}
 @media (max-width:600px){.c3,.c6{grid-column:span 12}}
@@ -96,7 +96,9 @@ th.hl,td.hl{background:var(--soft)}
 .port td:first-child{min-width:240px}
 .port .pn{font-weight:700}
 .port .pc{font-size:.76rem;color:var(--muted)}
-.port .barcell{width:18%;min-width:140px}
+.port .barcell{width:16%;min-width:150px}
+.minirow{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--muted)}
+.minirow .mini{flex:1}
 .mini{height:6px;background:var(--soft);position:relative;border-radius:3px}
 .mini b{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
 .mini b.over{background:var(--bad)}
@@ -116,7 +118,7 @@ th.hl,td.hl{background:var(--soft)}
 .proj .insight b{color:var(--ink)}
 .assume{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.field label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.field label{white-space:nowrap;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 .inp{display:flex;align-items:center;border:1px solid var(--line);background:var(--page);border-radius:4px;min-width:0}
 .inp:focus-within{border-color:var(--accent)}
 .inp span{padding:0 8px;color:var(--muted);font-size:.82rem}
@@ -185,6 +187,21 @@ dt .co{display:inline;margin-left:6px}
 details summary{cursor:pointer;font-weight:600;font-size:.86rem;color:var(--accent)}
 details[open] summary{margin-bottom:10px}
 .confirm{display:inline-flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.8rem}
+
+/* abas do projeto */
+.vtabs{display:flex;gap:4px;border-top:1px solid var(--line);margin:4px -18px -16px;padding:0 12px;overflow-x:auto}
+.vtabs button{border:0;background:none;padding:12px 12px 10px;font-size:.88rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+.vtabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.vtabs button:hover{color:var(--ink)}
+.foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;align-items:baseline}
+.pstrip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--line);border-radius:4px}
+.pstrip > div{padding:12px 14px;display:flex;flex-direction:column;gap:2px;border-left:1px solid var(--line)}
+.pstrip > div:first-child{border-left:0}
+.pstrip b{font-size:1.25rem;font-weight:700}
+.pstrip span{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
+@media (max-width:760px){.pstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.pstrip > div:nth-child(3){border-left:0}.pstrip > div:nth-child(n+3){border-top:1px solid var(--line)}}
+td.cur,th.cur{background:var(--soft)}
+td.vs{font-size:.78rem;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.bar .fill,.share .sb b,.cat .tr b,.mini b{transition:width .35s ease}}
 </style>
 
@@ -215,7 +232,7 @@ details[open] summary{margin-bottom:10px}
 
   <div class="dash" id="dash" hidden>
     <section class="card c12" aria-label="Carteira">
-      <div class="card-hd"><h3>Carteira de projetos</h3><span class="sub">Clique num projeto para ver o detalhe</span></div>
+      <h3>Carteira de projetos</h3>
       <div class="tbl"><table class="port"><thead><tr><th>Projeto</th><th class="n">Realização</th><th class="n">Receita</th><th class="n">Valor líquido</th><th class="n">Saldo líquido</th><th>Consumo × prazo</th><th class="n">Disponível/mês</th><th class="n">Data limite</th><th>Situação</th></tr></thead><tbody id="tabs"></tbody></table></div>
     </section>
 
@@ -224,7 +241,6 @@ details[open] summary{margin-bottom:10px}
         <div class="who">
           <span class="eyebrow" id="pEyebrow"></span>
           <div class="nm"><h2 id="pName"></h2><span id="pStatus"></span></div>
-          <div class="insight" id="action"></div>
         </div>
         <div class="assume" aria-label="Premissas">
           <div class="field f-real"><label for="inReal">Realização</label><div class="inp"><input id="inReal" type="number" inputmode="decimal" min="0" max="200" step="0.1"><span>%</span></div></div>
@@ -233,25 +249,42 @@ details[open] summary{margin-bottom:10px}
           <label class="check"><input id="inDesp" type="checkbox"><span>Descontar despesas do saldo</span></label>
         </div>
       </div>
-      <div class="proj-foot"><span id="liqHint"></span><span id="pMeta"></span><span id="rmBox"></span></div>
+      <nav class="vtabs" role="tablist" aria-label="Visões do projeto">
+        <button role="tab" data-v="geral" aria-selected="true">Visão geral</button>
+        <button role="tab" data-v="plano" aria-selected="false">Planejamento de horas</button>
+        <button role="tab" data-v="prof" aria-selected="false">Profissionais</button>
+        <button role="tab" data-v="desp" aria-selected="false">Despesas</button>
+      </nav>
     </section>
 
-    <div class="c12 dash" id="kpis" style="gap:16px"></div>
-
-    <section class="card c8" aria-label="Receita por mês">
-      <div class="card-hd"><h3>Receita realizada e disponível por mês</h3>
-        <div class="legend"><span><i style="background:var(--accent)"></i>Realizada</span><span><i style="background:var(--plan)"></i>Disponível até a data limite</span><span><i style="background:var(--pace);height:2px;vertical-align:3px"></i>Ritmo das últimas 4 semanas</span></div>
+    <!-- Visão geral -->
+    <div class="c12 dash" id="kpis" data-view="geral"></div>
+    <section class="card c8" aria-label="Receita por mês" data-view="geral">
+      <div class="card-hd"><h3>Receita por mês</h3>
+        <div class="legend"><span><i style="background:var(--accent)"></i>Realizada</span><span><i style="background:var(--plan)"></i>Disponível</span><span><i style="background:var(--pace);height:2px;vertical-align:3px"></i>Ritmo atual</span></div>
       </div>
       <div class="chart" id="chart"></div>
     </section>
-
-    <section class="card c4" aria-label="Consumo do orçamento">
-      <div class="card-hd"><h3>Consumo do orçamento</h3></div>
-      <div id="burn" style="display:flex;flex-direction:column;gap:10px"></div>
+    <section class="card c4" aria-label="Consumo do orçamento" data-view="geral">
+      <h3>Consumo do orçamento</h3>
+      <div id="burn" style="display:flex;flex-direction:column;gap:12px"></div>
     </section>
 
-    <section class="card c7" aria-label="Profissionais">
-      <div class="card-hd"><h3>Profissionais</h3>
+    <!-- Planejamento -->
+    <section class="card c12" aria-label="Planejamento de horas" data-view="plano" hidden>
+      <div class="card-hd"><h3>Planejamento de horas por profissional</h3>
+        <div class="assume">
+          <div class="field f-real"><label for="inRes">Reserva no fim</label><div class="inp"><input id="inRes" type="number" inputmode="decimal" min="0" max="50" step="0.5"><span>%</span></div></div>
+          <div class="field"><label>Distribuir pelo mix</label><div class="seg" role="group" aria-label="Base do mix"><button id="mRec" aria-pressed="true">Últimas 4 semanas</button><button id="mTot" aria-pressed="false">Projeto todo</button></div></div>
+        </div>
+      </div>
+      <div class="pstrip" id="planSum"></div>
+      <div class="tbl" id="plan"></div>
+    </section>
+
+    <!-- Profissionais -->
+    <section class="card c12" aria-label="Profissionais" data-view="prof" hidden>
+      <div class="card-hd"><h3>Horas e receita por profissional</h3>
         <div class="seg" role="group" aria-label="Visão">
           <button id="vRes" aria-pressed="true">Resumo</button>
           <button id="vHrs" aria-pressed="false">Horas por mês</button>
@@ -261,17 +294,17 @@ details[open] summary{margin-bottom:10px}
       <div class="tbl" id="people"></div>
     </section>
 
-    <section class="card c5" aria-label="Resumo de despesas">
+    <!-- Despesas -->
+    <section class="card c4" aria-label="Resumo de despesas" data-view="desp" hidden>
       <div class="card-hd"><h3>Despesas</h3><span class="sub" id="expSum"></span></div>
-      <div id="expSide" style="display:flex;flex-direction:column;gap:16px"></div>
+      <div id="expSide" style="display:flex;flex-direction:column;gap:18px"></div>
     </section>
-
-    <section class="card c12" aria-label="Despesas por mês">
-      <div class="card-hd"><h3>Despesas por tipo e mês</h3><span class="sub">Valores por mês do lançamento</span></div>
+    <section class="card c8" aria-label="Despesas por tipo e mês" data-view="desp" hidden>
+      <h3>Por tipo e mês</h3>
       <div id="expenses" style="display:flex;flex-direction:column;gap:14px"></div>
     </section>
 
-    <p class="source c12" id="source"></p>
+    <footer class="c12 foot"><p class="source" id="source"></p><span id="rmBox"></span></footer>
   </div>
 </div>
 
@@ -313,14 +346,14 @@ const DEFAULTS = {
   "2002383923": {real:17, valor:728875.00, prazo:"2026-12"},   // Coop. Holambra - COI Design (R$ 850.000 bruto − 14,25% de impostos)
   "2002396135": {real:20, valor:1428170.65, prazo:"2027-06"}   // CoE Supply Chain - Wave 2
 };
-const state = { datasets:{}, settings:{}, sel:null, view:"res", expMonth:"all", db:null, shared:false };
+const state = { datasets:{}, settings:{}, sel:null, view:"res", pview:null, expMonth:"all", db:null, shared:false };
 const LS_KEY = "painel-fin-v1";
 function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||"null"); if(j){ state.settings=j.settings||{}; if(!state.shared) state.datasets=j.datasets||{}; state.sel=j.sel||null; } }catch(e){} }
 function lsSave(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({settings:state.settings, datasets: state.shared?{}:state.datasets, sel:state.sel})); }catch(e){} }
 function getSet(eng){
   const s = state.settings[eng] || {};
   const d = DEFAULTS[eng] || {};
-  return { real: s.real ?? d.real ?? null, valor: s.valor ?? d.valor ?? null, prazo: s.prazo || d.prazo || "", deduzir: s.deduzir ?? d.deduzir ?? false };
+  return { real: s.real ?? d.real ?? null, valor: s.valor ?? d.valor ?? null, prazo: s.prazo || d.prazo || "", deduzir: s.deduzir ?? d.deduzir ?? false, reserva: s.reserva ?? d.reserva ?? 5, mix: s.mix || "rec" };
 }
 const liquido = s => s.valor; // o painel trabalha sempre com o valor líquido
 
@@ -440,6 +473,7 @@ function compute(eng){
     const pk = /^BOT\b/i.test(r.p) ? (r.p.replace(/\s+[A-Z]{1,3}\d{2,}\b/,"").trim() || "BOT") : r.p; // agrupa os BOTs
     const P=people[pk]||(people[pk]={p:pk,levels:new Set(),rates:new Set(),h:0,v:0,mh:{},mv:{}});
     if(r.l)P.levels.add(r.l); if(r.r)P.rates.add(r.r); P.h+=r.h; P.v+=r.v;
+    if(r.d && r.d>d28){ P.h28=(P.h28||0)+r.h; P.v28=(P.v28||0)+r.v; }
     if(r.l && (P.lastD==null || (r.d||"")>=P.lastD)){ P.lastD=r.d||""; P.lastL=r.l; if(r.r) P.lastR=r.r; } // cargo mais recente
     if(r.d){const k=r.d.slice(0,7); P.mh[k]=(P.mh[k]||0)+r.h; P.mv[k]=(P.mv[k]||0)+r.v;}
   }
@@ -490,17 +524,17 @@ function renderPortfolio(engs){
   $("tabs").innerHTML = rows.map(({e,c,st})=>{
     const used = c.valor>0 ? c.consumo/c.valor : null;
     return `<tr data-eng="${esc(e)}" class="${e===state.sel?"sel":""}" tabindex="0" aria-selected="${e===state.sel}">
-      <td><div class="pn">${esc(c.ds.desc||e)}</div><div class="pc">${esc(titleCase(c.ds.client))} · Eng. ${esc(e)}</div></td>
+      <td><div class="pn">${esc(c.ds.desc||e)}</div><div class="pc">${esc(titleCase(c.ds.client))}</div></td>
       <td class="n">${c.s.real==null?"—":N1.format(c.s.real)+"%"}</td>
       <td class="n">${c.s.real==null?"—":money(c.receita)}</td>
       <td class="n">${money(c.valor)}</td>
       <td class="n ${c.saldo!=null&&c.saldo<0?"neg":""}"><b>${money(c.saldo)}</b></td>
-      <td class="barcell">${used==null?'<span class="muted">—</span>':`<div class="mini" title="${PCT(used)} consumido · ${c.elapsed!=null?PCT(c.elapsed)+" do prazo":""}"><b class="${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></b>${c.elapsed!=null?`<i style="left:calc(${c.elapsed*100}% - 1px)"></i>`:""}</div><div class="pc" style="margin-top:4px">${PCT(used)} consumido${c.elapsed!=null?` · ${PCT(c.elapsed)} do prazo`:""}</div>`}</td>
+      <td class="barcell">${used==null?'<span class="muted">—</span>':`<div class="minirow"><div class="mini" title="${PCT(used)} do orçamento consumido${c.elapsed!=null?` · ${PCT(c.elapsed)} do prazo decorrido`:""}"><b class="${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></b>${c.elapsed!=null?`<i style="left:calc(${c.elapsed*100}% - 1px)"></i>`:""}</div><span>${N0.format(used*100)}%</span></div>`}</td>
       <td class="n">${money(c.saldoMes)}</td>
       <td class="n">${c.s.prazo? monthLabel(c.s.prazo):"—"}</td>
       <td><span class="st ${st.cls}"><i></i>${esc(st.short)}</span></td></tr>`;
   }).join("")
-    + (rows.length>1? `<tr class="tot"><td>Total da carteira</td><td></td><td class="n">${money(tot.rec)}</td><td class="n">${money(tot.val)}</td><td class="n">${money(tot.sal)}</td><td></td><td class="n">${money(tot.mes)}</td><td></td><td></td></tr>`:"");
+    + (rows.length>1? `<tr class="tot"><td>Total</td><td></td><td class="n">${money(tot.rec)}</td><td class="n">${money(tot.val)}</td><td class="n">${money(tot.sal)}</td><td></td><td class="n">${money(tot.mes)}</td><td></td><td></td></tr>`:"");
 }
 function statusOf(c){
   if(c.s.real==null) return {cls:"plain",short:"Sem realização"};
@@ -510,66 +544,105 @@ function statusOf(c){
   if(c.runOut && c.end && c.runOut<c.end) return {cls:"warn",short:"Atenção ao ritmo"};
   return {cls:"ok",short:"No orçamento"};
 }
-function insight(c){
-  if(c.s.real==null||c.valor==null) return "Preencha a realização, o valor líquido e a data limite ao lado para calcular o saldo.";
-  if(c.saldo<0) return `Orçamento estourado em <b>${money(-c.saldo)}</b>: a receita reconhecida (${money(c.consumo)}) passou do valor líquido (${money(c.valor)}).`;
-  if(!c.monthsLeft) return `Saldo de <b>${money(c.saldo)}</b>, mas a data limite já passou.`;
-  let t=`Saldo de <b>${money(c.saldo)}</b> cobre <b>${money(c.saldoMes)} por mês</b> até ${mesAno(c.s.prazo)}.`;
-  if(!(c.ritmo>0)) return t+" Sem horas lançadas nas últimas 4 semanas.";
-  const r=c.ritmo/c.saldoMes;
-  if(r>1.1) return t+` O ritmo atual (${money(c.ritmo)}/mês) está <b class="neg">${N0.format((r-1)*100)}% acima</b> do disponível. Nesse ritmo o saldo acaba em ${fmtDate(isoDate(c.runOut))}.`;
-  if(r<0.9) return t+` O ritmo atual (${money(c.ritmo)}/mês) usa <b>${N0.format(r*100)}%</b> do disponível, com espaço para cerca de ${N0.format(c.horasMes*(1-r))} h a mais por mês.`;
-  return t+` O ritmo atual (${money(c.ritmo)}/mês) está alinhado ao disponível.`;
-}
 function renderParams(){
   const e=state.sel, s=getSet(e), ds=state.datasets[e];
   const ae=document.activeElement;
   if(ae!==$("inReal")) $("inReal").value = s.real ?? "";
   if(ae!==$("inValor")) $("inValor").value = fmtValorInput(s.valor);
   if(ae!==$("inPrazo")) $("inPrazo").value = s.prazo || "";
+  if(ae!==$("inRes")) $("inRes").value = s.reserva ?? 5;
+  $("mRec").setAttribute("aria-pressed", String(s.mix!=="tot")); $("mTot").setAttribute("aria-pressed", String(s.mix==="tot"));
   $("inDesp").checked = !!s.deduzir;
-  $("liqHint").textContent = "Valores líquidos de impostos · Receita = charge-out rate × horas × realização";
-  $("pEyebrow").textContent = `${titleCase(ds.client)} · Engagement ${e}`;
+  $("pEyebrow").textContent = `${titleCase(ds.client)} · Eng. ${e}`;
   $("pName").textContent = ds.desc || e;
-  const imp = ds.importedAt? new Date(ds.importedAt) : null;
-  $("pMeta").textContent = `Arquivo ${ds.fileName||"—"} · importado em ${imp? imp.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"—"}`;
   $("rmBox").innerHTML = `<button class="btn link danger" id="rmBtn">Remover projeto do painel</button>`;
 }
-function kpi(label,value,sub,cls=""){ return `<div class="card kpi c3 ${cls}"><span class="eyebrow">${label}</span><span class="v">${value}</span><span class="s">${sub}</span></div>`; }
+function setView(v){
+  state.pview=v;
+  for(const b of document.querySelectorAll(".vtabs button")) b.setAttribute("aria-selected", String(b.dataset.v===v));
+  for(const el of document.querySelectorAll("[data-view]")) el.hidden = el.dataset.view!==v;
+  if(v==="geral" && state.sel) renderChart(compute(state.sel));
+  try{ localStorage.setItem(LS_KEY+":view", v); }catch(e){}
+}
+function kpi(label,value,sub,cls=""){ return `<div class="card kpi c3 ${cls}"><span class="eyebrow">${label}</span><span class="v">${value}</span>${sub?`<span class="s">${sub}</span>`:""}</div>`; }
 function renderDetail(){
   const c=compute(state.sel); const st=statusOf(c);
   $("pStatus").innerHTML=`<span class="st ${st.cls}"><i></i>${esc(st.short)}</span>`;
-  $("action").innerHTML=insight(c);
-  const mesesTxt = c.monthsLeft==null? "Defina a data limite" : c.monthsLeft===0? "Prazo encerrado" : `${N1.format(c.monthsLeft)} meses até ${fmtDate(isoDate(c.end))}`;
   $("kpis").innerHTML =
-    kpi("Receita reconhecida", c.s.real==null? "—" : money(c.receita), `${N1.format(c.hours)} h · ${money(c.tab)} a tabela × ${c.s.real==null?"—":N1.format(c.s.real)+"%"}`) +
-    kpi("Saldo líquido", money(c.saldo), c.valor==null? "Informe o valor do projeto" : `${c.valor>0?PCT(Math.max(0,c.saldo)/c.valor):"—"} de ${money(c.valor)}${c.s.deduzir?" · despesas descontadas":""}`, (c.saldo!=null&&c.saldo<0?"neg ":"")+"key") +
-    kpi("Disponível por mês", c.saldoMes==null? "—" : money(c.saldoMes), c.horasMes!=null && c.saldoMes>0 ? `${mesesTxt} · ~${N0.format(c.horasMes)} h/mês` : mesesTxt) +
-    kpi("Despesas", money(c.desp), `${c.ds.exp.length} lançamentos · ${c.s.deduzir?"descontadas do saldo":"fora do saldo"}`);
+    kpi("Receita reconhecida", c.s.real==null? "—" : money(c.receita), `${N0.format(c.hours)} horas`) +
+    kpi("Saldo líquido", money(c.saldo), c.valor==null? "" : `de ${money(c.valor)}`, (c.saldo!=null&&c.saldo<0?"neg ":"")+"key") +
+    kpi("Disponível por mês", c.saldoMes==null? "—" : money(c.saldoMes), c.s.prazo? `até ${monthLabel(c.s.prazo)}` : "") +
+    kpi("Despesas", money(c.desp), "");
   if(c.valor!=null && c.valor>0){
     const used=c.consumo/c.valor;
-    const gap = c.elapsed!=null ? used - c.elapsed : null;
     $("burn").innerHTML = `
       <div class="bar" role="img" aria-label="${PCT(used)} do orçamento consumido">
         <div class="fill ${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></div>
         ${c.elapsed!=null? `<div class="mark" style="left:calc(${c.elapsed*100}% - 1px)" title="Prazo decorrido"></div>`:""}
       </div>
-      <div class="scale"><span>R$ 0</span><span>${money(c.valor)}</span></div>
       <div class="legend"><span><i style="background:var(--accent)"></i>Consumido</span><span><i style="background:var(--ink);width:2px"></i>Prazo decorrido</span></div>
       <div class="stats">
-        <div><b>${PCT(used)}</b><span>do orçamento consumido</span></div>
-        <div><b>${c.elapsed!=null?PCT(c.elapsed):"—"}</b><span>do prazo decorrido</span></div>
-        <div><b class="${gap>0?"neg":""}">${gap==null?"—":(gap<=0?"−":"+")+N0.format(Math.abs(gap)*100)+" p.p."}</b><span>consumo ${gap!=null&&gap>0?"acima":"abaixo"} do prazo</span></div>
-        <div><b>${c.ritmo>0?money(c.ritmo):"—"}</b><span>ritmo/mês (últimas 4 sem.)</span></div>
-        <div><b>${money(c.blended)}</b><span>valor/hora médio a tabela</span></div>
-        <div><b>${c.runOut? fmtDate(isoDate(c.runOut)) : "—"}</b><span>saldo acaba no ritmo atual</span></div>
+        <div><b>${PCT(used)}</b><span>orçamento consumido</span></div>
+        <div><b>${c.elapsed!=null?PCT(c.elapsed):"—"}</b><span>prazo decorrido</span></div>
+        <div><b>${c.ritmo>0?money(c.ritmo):"—"}</b><span>ritmo atual por mês</span></div>
+        <div><b class="${c.runOut&&c.end&&c.runOut<c.end?"neg":""}">${c.runOut? fmtDate(isoDate(c.runOut)) : "—"}</b><span>saldo acaba no ritmo atual</span></div>
       </div>`;
   } else {
-    $("burn").innerHTML = `<div class="notice">Informe o valor líquido do projeto para ver o consumo do orçamento.</div>`;
+    $("burn").innerHTML = `<div class="notice">Informe o valor líquido do projeto.</div>`;
   }
-  const ds=c.ds; const imp=ds.importedAt? new Date(ds.importedAt).toLocaleDateString("pt-BR") : "—";
-  $("source").textContent = `Fonte: exportação de horas e despesas (${ds.fileName||"planilha"}), importada em ${imp}; lançamentos de ${fmtDate(c.minD)} a ${fmtDate(c.maxD)}. Receita = charge-out rate × horas × realização. Ritmo = receita das últimas 4 semanas convertida para mês. Valores líquidos de impostos.`;
-  renderChart(c); renderPeople(c); renderExpenses(c);
+  const ds=c.ds; const imp=ds.importedAt? new Date(ds.importedAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}) : "—";
+  $("source").textContent = `Fonte: ${ds.fileName||"planilha"}, importada em ${imp} · lançamentos de ${fmtDate(c.minD)} a ${fmtDate(c.maxD)} · Receita = charge-out × horas × realização · valores líquidos de impostos · ritmo = últimas 4 semanas`;
+  renderChart(c); renderPlan(c); renderPeople(c); renderExpenses(c);
+  setView(state.pview||"geral");
+}
+
+/* ---------- planejamento de horas ---------- */
+function planOf(c){
+  const s=c.s; const reserva=(s.reserva??5)/100;
+  if(s.real==null || !c.real || c.valor==null) return {err:"Informe a realização e o valor líquido do projeto."};
+  if(!c.monthsLeft) return {err:"Defina uma data limite futura para planejar as horas."};
+  const alvo = c.valor*(1-reserva) - c.consumo;
+  const months=[c.curM, ...c.futureMonths];
+  const w=months.map((k,i)=> i===0 ? c.frac : 1);
+  // mix da equipe: participação no valor a tabela (últimas 4 semanas ou projeto todo)
+  let base = s.mix==="tot" ? "tot" : "rec";
+  let pool = c.people.map(p=>({p, v: Math.max(0, base==="rec" ? (p.v28||0) : p.v)})).filter(x=>x.v>0);
+  if(!pool.length && base==="rec"){ base="tot"; pool=c.people.map(p=>({p,v:Math.max(0,p.v)})).filter(x=>x.v>0); }
+  const sumV=pool.reduce((a,x)=>a+x.v,0);
+  const rows=pool.map(({p,v})=>{
+    const share=v/sumV, rate=p.lastR||[...p.rates].sort((a,b)=>b-a)[0]||0;
+    const hrs=months.map((k,i)=> alvo>0 && rate>0 ? (alvo*w[i]/c.monthsLeft)*share/(c.real*rate) : 0);
+    return {p, share, rate, hrs, tot:hrs.reduce((a,b)=>a+b,0), atual:(p.h28||0)/28*30.44};
+  });
+  return {alvo, reserva, reservaV:c.valor*reserva, months, w, rows, base};
+}
+function renderPlan(c){
+  const P=planOf(c);
+  if(P.err){ $("planSum").innerHTML=""; $("plan").innerHTML=`<div class="notice">${esc(P.err)}</div>`; return; }
+  const totH=P.rows.reduce((a,r)=>a+r.tot,0);
+  const fullMonths=P.months.length-1+(P.w[0]);
+  const hMes = fullMonths>0 ? totH/fullMonths : 0;
+  const atual = P.rows.reduce((a,r)=>a+r.atual,0);
+  $("planSum").innerHTML = `
+    <div><span>A consumir até o fim</span><b class="${P.alvo<0?"neg":""}">${money(P.alvo)}</b></div>
+    <div><span>Reserva final (${N1.format(P.reserva*100)}%)</span><b>${money(P.reservaV)}</b></div>
+    <div><span>Horas planejadas</span><b>${N0.format(totH)} h</b></div>
+    <div><span>Horas por mês · ritmo atual</span><b>${N0.format(hMes)} h <span class="muted" style="font-size:.9rem;text-transform:none;letter-spacing:0;font-weight:500">· ${N0.format(atual)} h</span></b></div>`;
+  if(P.alvo<=0){ $("plan").innerHTML=`<div class="notice err">O saldo já está abaixo da reserva de ${N1.format(P.reserva*100)}%. Não há horas a planejar sem consumir a reserva.</div>`; return; }
+  const groups={};
+  for(const r of P.rows){ const g=groupOf(r.p); const G=groups[g.k]||(groups[g.k]={...g,rows:[],hrs:P.months.map(()=>0),tot:0,atual:0}); G.rows.push(r); r.hrs.forEach((h,i)=>G.hrs[i]+=h); G.tot+=r.tot; G.atual+=r.atual; }
+  const glist=GORDER.filter(k=>groups[k]).map(k=>groups[k]); glist.forEach(G=>G.rows.sort((a,b)=>b.tot-a.tot));
+  const h=v=> v>0.05 ? N0.format(v) : "–";
+  const mh = k => k===c.curM ? `${monthLabel(k)}*` : monthLabel(k);
+  const colTot=P.months.map((k,i)=>P.rows.reduce((a,r)=>a+r.hrs[i],0));
+  const colRec=P.months.map((k,i)=>P.rows.reduce((a,r)=>a+r.hrs[i]*r.rate*c.real,0));
+  $("plan").innerHTML = `<table><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">Ritmo atual h/mês</th>${P.months.map((k,i)=>`<th class="n ${i===0?"cur":""}">${mh(k)}</th>`).join("")}<th class="n">Total h</th></tr></thead><tbody>
+    ${glist.map(G=>`<tr class="grp"><td>${esc(G.nm)}</td><td></td><td class="n">${h(G.atual)}</td>${G.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(G.tot)}</td></tr>`
+      + G.rows.map(r=>`<tr class="ind"><td><div class="who">${esc(r.p.p)}</div><div class="lvl">${esc(titleCase(r.p.lastL||""))} · ${N0.format(r.share*100)}% do mix</div></td><td class="n">${N0.format(r.rate)}</td><td class="n">${h(r.atual)}</td>${r.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n"><b>${h(r.tot)}</b></td></tr>`).join("")).join("")}
+    <tr class="tot"><td>Total de horas</td><td></td><td class="n">${h(atual)}</td>${colTot.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(totH)}</td></tr>
+    <tr><td class="muted">Receita planejada</td><td></td><td></td>${colRec.map((v,i)=>`<td class="n muted ${i===0?"cur":""}">${compact(v)}</td>`).join("")}<td class="n muted">${compact(colRec.reduce((a,b)=>a+b,0))}</td></tr>
+  </tbody></table>
+  <p class="source" style="margin-top:10px">* ${monthLabel(c.curM)}: só os dias que faltam no mês. Mix ${P.base==="rec"?"das últimas 4 semanas":"do projeto todo"}, pela participação de cada pessoa no valor a tabela. Horas = receita do mês × participação ÷ (charge-out × realização).</p>`;
 }
 
 function renderChart(c){
@@ -622,7 +695,7 @@ function renderPeople(c){
   for(const p of c.people){ const g=groupOf(p); (groups[g.k]||(groups[g.k]={...g,rows:[],h:0,v:0,mh:{},mv:{}})); const G=groups[g.k]; G.rows.push(p); G.h+=p.h; G.v+=p.v; for(const k in p.mh){G.mh[k]=(G.mh[k]||0)+p.mh[k];} for(const k in p.mv){G.mv[k]=(G.mv[k]||0)+p.mv[k];} }
   const glist=GORDER.filter(k=>groups[k]).map(k=>groups[k]);
   glist.forEach(G=>G.rows.sort((a,b)=>b.v-a.v));
-  const who=p=>`<div class="who">${esc(p.p)}</div><div class="lvl">${esc(titleCase(p.lastL||""))}${p.levels.size>1?` <span title="Cargos no período: ${esc([...p.levels].map(titleCase).join(" → "))}">· promovido</span>`:""}</div>`;
+  const who=p=>`<div class="who">${esc(p.p)}</div><div class="lvl">${esc(titleCase(p.lastL||""))}</div>`;
   const rateOf=p=>{ const r=p.lastR||[...p.rates].sort((a,b)=>b-a)[0]||0; return N0.format(r); };
   if(state.view==="res"){
     const shareCell=v=>{ const sh=totV? v/totV:0; return `<div class="share"><span>${PCT(sh)}</span><span class="sb"><b style="width:${Math.max(0,sh*100)}%"></b></span></div>`; };
@@ -662,17 +735,17 @@ function renderExpenses(c){
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]); const maxC=Math.max(1,...cats.map(x=>x[1]));
   const ps=Object.entries(byP).sort((a,b)=>b[1]-a[1]); const maxP=Math.max(1,...ps.map(x=>x[1]));
   const catName = t => { const i=catInfo(t); return `<span class="cn">${esc(i.pt)}</span>${i.pt!==t?`<span class="co">${esc(t)}</span>`:""}`; };
-  const list=(arr,mx,isCat)=>arr.map(([n,v])=>`<div class="cat"><span class="nm" title="${esc(isCat? catInfo(n).desc : n)}">${isCat? catName(n) : esc(n)}</span><span class="tr"><b style="width:${Math.max(0,v/mx*100)}%"></b></span><span class="${v<0?"neg":""}">${BRL2.format(v)}</span></div>`).join("");
+  const list=(arr,mx,isCat)=>arr.map(([n,v])=>`<div class="cat"><span class="nm" title="${esc(isCat? catInfo(n).desc : n)}">${isCat? esc(catInfo(n).pt) : esc(n)}</span><span class="tr"><b style="width:${Math.max(0,v/mx*100)}%"></b></span><span class="${v<0?"neg":""}">${BRL2.format(v)}</span></div>`).join("");
   const ml = k => k==="s/d"? "sem data" : monthLabel(k);
   const per = sel==="all"?"todos os meses":ml(sel);
-  $("expSum").textContent = `${BRL2.format(fat)} de ${BRL2.format(c.desp)} já faturado`;
+  $("expSum").textContent = `${BRL2.format(fat)} faturado`;
 
   $("expSide").innerHTML = `
     <div class="mchips" role="group" aria-label="Filtrar por mês">
       <button class="mchip" aria-pressed="${sel==="all"}" data-m="all"><span>Todos</span><b>${BRL2.format(c.desp)}</b></button>
       ${months.map(k=>`<button class="mchip" aria-pressed="${sel===k}" data-m="${esc(k)}"><span>${ml(k)}</span><b>${BRL2.format(mTot[k])}</b></button>`).join("")}
     </div>
-    <div class="cats"><span class="eyebrow">Por tipo · ${per}</span>${list(cats.slice(0,6),maxC,true)}${cats.length>6?`<span class="muted" style="font-size:.78rem">+ ${cats.length-6} tipos na tabela abaixo</span>`:""}</div>
+    <div class="cats"><span class="eyebrow">Por tipo · ${per}</span>${list(cats.slice(0,6),maxC,true)}</div>
     <div class="cats"><span class="eyebrow">Por profissional · ${per}</span>${list(ps,maxP,false)}</div>`;
 
   const allCats=[...new Set(ex.map(e=>e.t))];
@@ -755,7 +828,7 @@ async function initDb(){
   if(!db){ setSync("plain","Salvo só neste navegador"); renderAll(); return; }
   state.db=db; state.shared=true;
   db.collection("settings").onSnapshot(snap=>{
-    for(const d of snap.docs){ const v=d.data(); state.settings[d.id]={real:v.real??null, valor:v.valor??null, prazo:v.prazo??"", deduzir:!!v.deduzir}; }
+    for(const d of snap.docs){ const v=d.data(); state.settings[d.id]={real:v.real??null, valor:v.valor??null, prazo:v.prazo??"", deduzir:!!v.deduzir, reserva:v.reserva??5, mix:v.mix==="tot"?"tot":"rec"}; }
     setSync("ok","Salvo para a equipe"); renderAll();
   },()=>setSync("warn","Sem conexão com o armazenamento"));
   let first=true;
@@ -802,6 +875,11 @@ $("rmBox").addEventListener("click",e=>{
   else if(e.target.id==="rmYes"){ removeDataset(state.sel); }
   else if(e.target.id==="rmNo"){ renderParams(); }
 });
+document.querySelector(".vtabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-v]"); if(b) setView(b.dataset.v); });
+$("inRes").addEventListener("input",e=>{ const v=parseBR(e.target.value); upd({reserva: v==null?5:v}); });
+$("mRec").addEventListener("click",()=>{ upd({mix:"rec"}); renderParams(); });
+$("mTot").addEventListener("click",()=>{ upd({mix:"tot"}); renderParams(); });
+try{ const v=localStorage.getItem(LS_KEY+":view"); if(v) state.pview=v; }catch(e){}
 $("expSide").addEventListener("click",e=>{ const b=e.target.closest(".mchip"); if(!b) return; state.expMonth=b.dataset.m; renderExpenses(compute(state.sel)); });
 for(const [id,v] of [["vRes","res"],["vHrs","hrs"],["vRec","rec"]]) $(id).addEventListener("click",()=>{ state.view=v; renderPeople(compute(state.sel)); });
 /* tela cheia */
