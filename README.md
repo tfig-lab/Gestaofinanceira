@@ -9,7 +9,7 @@ Painel em uma única página (HTML + JavaScript, sem servidor) para acompanhar a
 - **Disponível por mês** até a data limite, em R$ de receita, em R$ a tabela e em horas aproximadas
 - Horas e receita por profissional (total e por mês), com os BOTs agrupados numa linha só
 - Despesas por mês, por tipo e por profissional, com uma descrição de cada tipo
-- **Planejamento de horas**: quantas horas cada profissional deve debitar por mês até a data limite para terminar com a reserva definida (padrão 5% do valor líquido), distribuídas pelo mix da equipe
+- **Planejamento de horas**: horas por profissional e mês até a data limite para terminar com a reserva definida (padrão 5%). Usa a capacidade de cada pessoa (dias úteis sem feriados nacionais × horas/dia × % máximo × dedicação ao projeto), enche primeiro os mais juniores e distribui o restante entre gerentes e sócios. Regras fixas por pessoa ficam em `DEFAULT_PEOPLE` no `index.html`.
 
 ## Como usar
 

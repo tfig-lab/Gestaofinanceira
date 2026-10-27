@@ -201,6 +201,13 @@ details[open] summary{margin-bottom:10px}
 .pstrip span{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600}
 @media (max-width:760px){.pstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.pstrip > div:nth-child(3){border-left:0}.pstrip > div:nth-child(n+3){border-top:1px solid var(--line)}}
 td.cur,th.cur{background:var(--soft)}
+table.plan td,table.plan th{padding:7px 8px}
+.bdays{font-size:.64rem;font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--muted)}
+.cin{width:56px;border:1px solid var(--line);background:var(--page);border-radius:3px;padding:3px 5px;text-align:right;font-size:.85rem}
+tr.off td{color:var(--muted)} tr.off .who{text-decoration:line-through}
+td.full{font-weight:700;color:var(--accent)}
+.warnc{color:var(--warn)}
+
 td.vs{font-size:.78rem;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.bar .fill,.share .sb b,.cat .tr b,.mini b{transition:width .35s ease}}
 </style>
@@ -275,7 +282,7 @@ td.vs{font-size:.78rem;color:var(--muted)}
       <div class="card-hd"><h3>Planejamento de horas por profissional</h3>
         <div class="assume">
           <div class="field f-real"><label for="inRes">Reserva no fim</label><div class="inp"><input id="inRes" type="number" inputmode="decimal" min="0" max="50" step="0.5"><span>%</span></div></div>
-          <div class="field"><label>Distribuir pelo mix</label><div class="seg" role="group" aria-label="Base do mix"><button id="mRec" aria-pressed="true">Últimas 4 semanas</button><button id="mTot" aria-pressed="false">Projeto todo</button></div></div>
+          
         </div>
       </div>
       <div class="pstrip" id="planSum"></div>
@@ -346,14 +353,14 @@ const DEFAULTS = {
   "2002383923": {real:17, valor:728875.00, prazo:"2026-12"},   // Coop. Holambra - COI Design (R$ 850.000 bruto − 14,25% de impostos)
   "2002396135": {real:20, valor:1428170.65, prazo:"2027-06"}   // CoE Supply Chain - Wave 2
 };
-const state = { datasets:{}, settings:{}, sel:null, view:"res", pview:null, expMonth:"all", db:null, shared:false };
+const state = { datasets:{}, settings:{}, sel:null, view:"res", pview:null, people:{}, expMonth:"all", db:null, shared:false };
 const LS_KEY = "painel-fin-v1";
-function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||"null"); if(j){ state.settings=j.settings||{}; if(!state.shared) state.datasets=j.datasets||{}; state.sel=j.sel||null; } }catch(e){} }
-function lsSave(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({settings:state.settings, datasets: state.shared?{}:state.datasets, sel:state.sel})); }catch(e){} }
+function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||"null"); if(j){ state.settings=j.settings||{}; state.people=j.people||{}; if(!state.shared) state.datasets=j.datasets||{}; state.sel=j.sel||null; } }catch(e){} }
+function lsSave(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({settings:state.settings, people:state.people, datasets: state.shared?{}:state.datasets, sel:state.sel})); }catch(e){} }
 function getSet(eng){
   const s = state.settings[eng] || {};
   const d = DEFAULTS[eng] || {};
-  return { real: s.real ?? d.real ?? null, valor: s.valor ?? d.valor ?? null, prazo: s.prazo || d.prazo || "", deduzir: s.deduzir ?? d.deduzir ?? false, reserva: s.reserva ?? d.reserva ?? 5, mix: s.mix || "rec" };
+  return { real: s.real ?? d.real ?? null, valor: s.valor ?? d.valor ?? null, prazo: s.prazo || d.prazo || "", deduzir: s.deduzir ?? d.deduzir ?? false, reserva: s.reserva ?? d.reserva ?? 5, ded: s.ded || {} };
 }
 const liquido = s => s.valor; // o painel trabalha sempre com o valor líquido
 
@@ -551,7 +558,6 @@ function renderParams(){
   if(ae!==$("inValor")) $("inValor").value = fmtValorInput(s.valor);
   if(ae!==$("inPrazo")) $("inPrazo").value = s.prazo || "";
   if(ae!==$("inRes")) $("inRes").value = s.reserva ?? 5;
-  $("mRec").setAttribute("aria-pressed", String(s.mix!=="tot")); $("mTot").setAttribute("aria-pressed", String(s.mix==="tot"));
   $("inDesp").checked = !!s.deduzir;
   $("pEyebrow").textContent = `${titleCase(ds.client)} · Eng. ${e}`;
   $("pName").textContent = ds.desc || e;
@@ -597,52 +603,137 @@ function renderDetail(){
 }
 
 /* ---------- planejamento de horas ---------- */
+// Regras por pessoa (valem para todos os projetos). hd = horas por dia; cap = % máximo da jornada; ativo = continua debitando
+const DEFAULT_PEOPLE = {
+  "Jhonatha da Silva Marques": {ativo:false},
+  "Ana Carolina De Luca De Azevedo": {hd:6},   // estagiária: 6 h por dia
+  "Lucas Quintino de Souza": {cap:50}           // debita no máximo 50% da jornada
+};
+function personCfg(name){
+  const d=DEFAULT_PEOPLE[name]||{}, s=(state.people||{})[name]||{};
+  return { ativo: s.ativo ?? d.ativo ?? true, hd: s.hd ?? d.hd ?? (getJornada()), cap: s.cap ?? d.cap ?? 100 };
+}
+function getJornada(){ return 8; }
+// feriados nacionais (fixos + móveis da Páscoa, incluindo Carnaval e Corpus Christi)
+function easter(y){ const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1; return new Date(y,mo-1,da); }
+const holCache={};
+function holidays(y){
+  if(holCache[y]) return holCache[y];
+  const set=new Set(["01-01","04-21","05-01","09-07","10-12","11-02","11-15","11-20","12-25"].map(md=>`${y}-${md}`));
+  const E=easter(y); for(const off of [-48,-47,-2,60]){ const d=new Date(E); d.setDate(d.getDate()+off); set.add(isoDate(d)); }
+  return holCache[y]=set;
+}
+function businessDays(k, fromDate){
+  const [y,m]=k.split("-").map(Number); const last=new Date(y,m,0).getDate(); let n=0;
+  for(let d=1; d<=last; d++){ const dt=new Date(y,m-1,d); if(fromDate && dt<fromDate) continue; const wd=dt.getDay(); if(wd===0||wd===6) continue; if(holidays(y).has(isoDate(dt))) continue; n++; }
+  return n;
+}
+// participação padrão da pessoa neste projeto: horas das últimas 4 semanas aqui ÷ horas em todos os projetos carregados
+function defaultDed(eng, name){
+  let here=0, all=0;
+  for(const [e,ds] of Object.entries(state.datasets)){
+    const d28=isoDate(new Date(Date.now()-28*864e5));
+    let h=0; for(const r of ds.time){ if(r.d>d28 && (r.p===name)) h+=r.h; }
+    all+=Math.max(0,h); if(e===eng) here=Math.max(0,h);
+  }
+  return all>0 && here>0 ? Math.round(here/all*100) : 100;
+}
 function planOf(c){
   const s=c.s; const reserva=(s.reserva??5)/100;
   if(s.real==null || !c.real || c.valor==null) return {err:"Informe a realização e o valor líquido do projeto."};
   if(!c.monthsLeft) return {err:"Defina uma data limite futura para planejar as horas."};
   const alvo = c.valor*(1-reserva) - c.consumo;
+  const today=new Date(); today.setHours(0,0,0,0);
   const months=[c.curM, ...c.futureMonths];
-  const w=months.map((k,i)=> i===0 ? c.frac : 1);
-  // mix da equipe: participação no valor a tabela (últimas 4 semanas ou projeto todo)
-  let base = s.mix==="tot" ? "tot" : "rec";
-  let pool = c.people.map(p=>({p, v: Math.max(0, base==="rec" ? (p.v28||0) : p.v)})).filter(x=>x.v>0);
-  if(!pool.length && base==="rec"){ base="tot"; pool=c.people.map(p=>({p,v:Math.max(0,p.v)})).filter(x=>x.v>0); }
-  const sumV=pool.reduce((a,x)=>a+x.v,0);
-  const rows=pool.map(({p,v})=>{
-    const share=v/sumV, rate=p.lastR||[...p.rates].sort((a,b)=>b-a)[0]||0;
-    const hrs=months.map((k,i)=> alvo>0 && rate>0 ? (alvo*w[i]/c.monthsLeft)*share/(c.real*rate) : 0);
-    return {p, share, rate, hrs, tot:hrs.reduce((a,b)=>a+b,0), atual:(p.h28||0)/28*30.44};
+  const bd=months.map((k,i)=>businessDays(k, i===0? today : null));
+  const sumBd=bd.reduce((a,b)=>a+b,0)||1;
+  const budget=months.map((k,i)=> Math.max(0,alvo)*bd[i]/sumBd);
+  const ded=(s.ded||{});
+  const people=c.people.filter(p=>groupOf(p).k!=="bot").map(p=>{
+    const cfg=personCfg(p.p); const g=groupOf(p);
+    const rate=p.lastR||[...p.rates].sort((a,b)=>b-a)[0]||0;
+    const dd = ded[p.p] ?? defaultDed(c.ds.eng||state.sel, p.p);
+    const cost=rate*c.real;
+    const cap=months.map((k,i)=> cfg.ativo ? bd[i]*cfg.hd*(cfg.cap/100)*(dd/100) : 0);
+    return {p, g, cfg, rate, ded:dd, cost, cap, hrs:months.map(()=>0), junior: g.k==="consult"||g.k==="outros", w:Math.max(0,(p.v28||0))||Math.max(0,p.v), atual:(p.h28||0)/28*30.44};
   });
-  return {alvo, reserva, reservaV:c.valor*reserva, months, w, rows, base};
+  const juniors=people.filter(x=>x.junior && x.cfg.ativo).sort((a,b)=>a.rate-b.rate || a.p.p.localeCompare(b.p.p));
+  const seniors=people.filter(x=>!x.junior && x.cfg.ativo);
+  const left=months.map(()=>0);
+  months.forEach((k,i)=>{
+    let R=budget[i];
+    // 1) enche a capacidade dos mais juniores primeiro (menor taxa antes)
+    for(const x of juniors){ if(R<=0||x.cost<=0) break; const h=Math.min(x.cap[i], R/x.cost); x.hrs[i]=h; R-=h*x.cost; }
+    // 2) o que sobrar vai para gerentes e sócios, pelo peso no valor a tabela recente, respeitando a capacidade
+    let pool=seniors.filter(x=>x.cost>0 && x.cap[i]>0);
+    while(R>0.5 && pool.length){
+      const W=pool.reduce((a,x)=>a+(x.w||1),0); let used=0; const next=[];
+      for(const x of pool){ const want=R*(x.w||1)/W; const room=(x.cap[i]-x.hrs[i])*x.cost; const take=Math.min(want,room); x.hrs[i]+=take/x.cost; used+=take; if(room-take>0.5) next.push(x); }
+      R-=used; if(next.length===pool.length && used<0.5) break; pool=next;
+    }
+    left[i]=Math.max(0,R);
+  });
+  return {alvo, reserva, reservaV:c.valor*reserva, months, bd, budget, people, left};
 }
 function renderPlan(c){
   const P=planOf(c);
   if(P.err){ $("planSum").innerHTML=""; $("plan").innerHTML=`<div class="notice">${esc(P.err)}</div>`; return; }
-  const totH=P.rows.reduce((a,r)=>a+r.tot,0);
-  const fullMonths=P.months.length-1+(P.w[0]);
-  const hMes = fullMonths>0 ? totH/fullMonths : 0;
-  const atual = P.rows.reduce((a,r)=>a+r.atual,0);
+  const rows=P.people;
+  const planned=rows.reduce((a,x)=>a+x.hrs.reduce((s,h)=>s+h,0)*x.cost,0);
+  const sobra=P.left.reduce((a,b)=>a+b,0);
+  const totH=rows.reduce((a,x)=>a+x.hrs.reduce((s,h)=>s+h,0),0);
   $("planSum").innerHTML = `
     <div><span>A consumir até o fim</span><b class="${P.alvo<0?"neg":""}">${money(P.alvo)}</b></div>
     <div><span>Reserva final (${N1.format(P.reserva*100)}%)</span><b>${money(P.reservaV)}</b></div>
     <div><span>Horas planejadas</span><b>${N0.format(totH)} h</b></div>
-    <div><span>Horas por mês · ritmo atual</span><b>${N0.format(hMes)} h <span class="muted" style="font-size:.9rem;text-transform:none;letter-spacing:0;font-weight:500">· ${N0.format(atual)} h</span></b></div>`;
+    <div><span>Sem capacidade para alocar</span><b class="${sobra>1?"warnc":""}">${money(sobra)}</b></div>`;
   if(P.alvo<=0){ $("plan").innerHTML=`<div class="notice err">O saldo já está abaixo da reserva de ${N1.format(P.reserva*100)}%. Não há horas a planejar sem consumir a reserva.</div>`; return; }
   const groups={};
-  for(const r of P.rows){ const g=groupOf(r.p); const G=groups[g.k]||(groups[g.k]={...g,rows:[],hrs:P.months.map(()=>0),tot:0,atual:0}); G.rows.push(r); r.hrs.forEach((h,i)=>G.hrs[i]+=h); G.tot+=r.tot; G.atual+=r.atual; }
-  const glist=GORDER.filter(k=>groups[k]).map(k=>groups[k]); glist.forEach(G=>G.rows.sort((a,b)=>b.tot-a.tot));
+  for(const x of rows){ const G=groups[x.g.k]||(groups[x.g.k]={...x.g,rows:[],hrs:P.months.map(()=>0)}); G.rows.push(x); x.hrs.forEach((h,i)=>G.hrs[i]+=h); }
+  const order=["consult","outros","gerentes","socios"];
+  const glist=order.filter(k=>groups[k]).map(k=>groups[k]);
+  glist.forEach(G=>G.rows.sort((a,b)=>(b.cfg.ativo-a.cfg.ativo)||(a.rate-b.rate)));
   const h=v=> v>0.05 ? N0.format(v) : "–";
-  const mh = k => k===c.curM ? `${monthLabel(k)}*` : monthLabel(k);
-  const colTot=P.months.map((k,i)=>P.rows.reduce((a,r)=>a+r.hrs[i],0));
-  const colRec=P.months.map((k,i)=>P.rows.reduce((a,r)=>a+r.hrs[i]*r.rate*c.real,0));
-  $("plan").innerHTML = `<table><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">Ritmo atual h/mês</th>${P.months.map((k,i)=>`<th class="n ${i===0?"cur":""}">${mh(k)}</th>`).join("")}<th class="n">Total h</th></tr></thead><tbody>
-    ${glist.map(G=>`<tr class="grp"><td>${esc(G.nm)}</td><td></td><td class="n">${h(G.atual)}</td>${G.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(G.tot)}</td></tr>`
-      + G.rows.map(r=>`<tr class="ind"><td><div class="who">${esc(r.p.p)}</div><div class="lvl">${esc(titleCase(r.p.lastL||""))} · ${N0.format(r.share*100)}% do mix</div></td><td class="n">${N0.format(r.rate)}</td><td class="n">${h(r.atual)}</td>${r.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n"><b>${h(r.tot)}</b></td></tr>`).join("")).join("")}
-    <tr class="tot"><td>Total de horas</td><td></td><td class="n">${h(atual)}</td>${colTot.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(totH)}</td></tr>
-    <tr><td class="muted">Receita planejada</td><td></td><td></td>${colRec.map((v,i)=>`<td class="n muted ${i===0?"cur":""}">${compact(v)}</td>`).join("")}<td class="n muted">${compact(colRec.reduce((a,b)=>a+b,0))}</td></tr>
+  const colTot=P.months.map((k,i)=>rows.reduce((a,x)=>a+x.hrs[i],0));
+  const colRec=P.months.map((k,i)=>rows.reduce((a,x)=>a+x.hrs[i]*x.cost,0));
+  const nm=esc;
+  const row=x=>{
+    const full=x.hrs.map((v,i)=>x.cap[i]>0 && v>=x.cap[i]-0.05);
+    return `<tr class="ind ${x.cfg.ativo?"":"off"}" data-p="${nm(x.p.p)}">
+      <td><div class="who">${nm(x.p.p)}</div><div class="lvl">${nm(titleCase(x.p.lastL||""))}</div></td>
+      <td class="n">${N0.format(x.rate)}</td>
+      <td class="n"><input class="cin" data-k="hd" type="number" min="0" max="12" step="0.5" value="${x.cfg.hd}" aria-label="Horas por dia de ${nm(x.p.p)}"></td>
+      <td class="n"><input class="cin" data-k="cap" type="number" min="0" max="100" step="5" value="${x.cfg.cap}" aria-label="Máximo da jornada de ${nm(x.p.p)}">%</td>
+      <td class="n"><input class="cin" data-k="ded" type="number" min="0" max="100" step="5" value="${x.ded}" aria-label="Dedicação ao projeto de ${nm(x.p.p)}">%</td>
+      <td class="n"><input type="checkbox" data-k="ativo" ${x.cfg.ativo?"checked":""} aria-label="${nm(x.p.p)} debita horas"></td>
+      ${x.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""} ${full[i]?"full":""}" title="Capacidade ${N0.format(x.cap[i])} h">${h(v)}</td>`).join("")}
+      <td class="n"><b>${h(x.hrs.reduce((a,b)=>a+b,0))}</b></td></tr>`;
+  };
+  $("plan").innerHTML = `<table class="plan"><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">h/dia</th><th class="n">Máx. jornada</th><th class="n">Neste projeto</th><th class="n">Debita</th>${P.months.map((k,i)=>`<th class="n ${i===0?"cur":""}">${monthLabel(k)}<br><span class="bdays">${P.bd[i]} dias úteis</span></th>`).join("")}<th class="n">Total h</th></tr></thead><tbody>
+    ${glist.map(G=>`<tr class="grp"><td colspan="6">${nm(G.k==="consult"?"Consultores e especialistas · prioridade":G.nm)}</td>${G.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(G.hrs.reduce((a,b)=>a+b,0))}</td></tr>`+G.rows.map(row).join("")).join("")}
+    <tr class="tot"><td colspan="6">Total de horas</td>${colTot.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(totH)}</td></tr>
+    <tr><td colspan="6" class="muted">Receita planejada · orçamento do mês</td>${colRec.map((v,i)=>`<td class="n muted ${i===0?"cur":""}">${compact(v)} / ${compact(P.budget[i])}</td>`).join("")}<td class="n muted">${compact(planned)}</td></tr>
   </tbody></table>
-  <p class="source" style="margin-top:10px">* ${monthLabel(c.curM)}: só os dias que faltam no mês. Mix ${P.base==="rec"?"das últimas 4 semanas":"do projeto todo"}, pela participação de cada pessoa no valor a tabela. Horas = receita do mês × participação ÷ (charge-out × realização).</p>`;
+  <p class="source" style="margin-top:10px">O orçamento de cada mês é proporcional aos dias úteis (${monthLabel(c.curM)} a partir de hoje). Os mais juniores enchem a capacidade primeiro, a partir da menor taxa; o restante vai para gerentes e sócios. Células destacadas = capacidade cheia. BOT fora do plano.</p>`;
+}
+function savePeople(){
+  lsSave();
+  if(!state.db) return;
+  clearTimeout(savePeople.t);
+  savePeople.t=setTimeout(async()=>{ try{ await state.db.doc("config/pessoas").set({pessoas:state.people||{}, updatedAt:new Date().toISOString()}); }catch(e){ setSync("warn","Regras só neste navegador"); } },500);
+}
+function onPlanInput(e){
+  const el=e.target; const tr=el.closest("tr[data-p]"); if(!tr||!el.dataset.k) return;
+  const name=tr.dataset.p, k=el.dataset.k;
+  if(k==="ded"){
+    const s=state.settings[state.sel]={...getSet(state.sel)}; s.ded={...(s.ded||{}), [name]: Math.max(0,Math.min(100,parseBR(el.value)??100))}; s.updatedAt=new Date().toISOString();
+    saveSettings(state.sel);
+  } else {
+    state.people=state.people||{}; const cur={...(state.people[name]||{})};
+    if(k==="ativo") cur.ativo=el.checked; else { const v=parseBR(el.value); if(v!=null) cur[k]=v; }
+    state.people[name]=cur; savePeople();
+  }
+  renderPlan(compute(state.sel));
 }
 
 function renderChart(c){
@@ -828,9 +919,10 @@ async function initDb(){
   if(!db){ setSync("plain","Salvo só neste navegador"); renderAll(); return; }
   state.db=db; state.shared=true;
   db.collection("settings").onSnapshot(snap=>{
-    for(const d of snap.docs){ const v=d.data(); state.settings[d.id]={real:v.real??null, valor:v.valor??null, prazo:v.prazo??"", deduzir:!!v.deduzir, reserva:v.reserva??5, mix:v.mix==="tot"?"tot":"rec"}; }
+    for(const d of snap.docs){ const v=d.data(); state.settings[d.id]={real:v.real??null, valor:v.valor??null, prazo:v.prazo??"", deduzir:!!v.deduzir, reserva:v.reserva??5, ded:(v.ded&&typeof v.ded==="object")?v.ded:{}}; }
     setSync("ok","Salvo para a equipe"); renderAll();
   },()=>setSync("warn","Sem conexão com o armazenamento"));
+  db.doc("config/pessoas").onSnapshot(d=>{ if(d.exists){ const v=d.data(); if(v.pessoas&&typeof v.pessoas==="object"){ state.people=v.pessoas; if(state.sel&&state.datasets[state.sel]) renderPlan(compute(state.sel)); } } },()=>{});
   let first=true;
   db.collection("datasets").onSnapshot(async snap=>{
     const ids=new Set(snap.docs.map(d=>d.id));
@@ -877,8 +969,7 @@ $("rmBox").addEventListener("click",e=>{
 });
 document.querySelector(".vtabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-v]"); if(b) setView(b.dataset.v); });
 $("inRes").addEventListener("input",e=>{ const v=parseBR(e.target.value); upd({reserva: v==null?5:v}); });
-$("mRec").addEventListener("click",()=>{ upd({mix:"rec"}); renderParams(); });
-$("mTot").addEventListener("click",()=>{ upd({mix:"tot"}); renderParams(); });
+$("plan").addEventListener("change",onPlanInput);
 try{ const v=localStorage.getItem(LS_KEY+":view"); if(v) state.pview=v; }catch(e){}
 $("expSide").addEventListener("click",e=>{ const b=e.target.closest(".mchip"); if(!b) return; state.expMonth=b.dataset.m; renderExpenses(compute(state.sel)); });
 for(const [id,v] of [["vRes","res"],["vHrs","hrs"],["vRec","rec"]]) $(id).addEventListener("click",()=>{ state.view=v; renderPeople(compute(state.sel)); });
