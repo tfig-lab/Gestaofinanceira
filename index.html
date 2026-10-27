@@ -81,6 +81,8 @@ td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
 tbody tr:last-child td{border-bottom:0}
 th.n,td.n{text-align:right;white-space:nowrap}
 tr.tot td{font-weight:700;border-bottom:0;border-top:1px solid var(--rule)}
+tr.grp td{background:var(--soft);font-weight:700;border-bottom:1px solid var(--line)}
+tr.ind td:first-child{padding-left:24px}
 td .who{font-weight:600}
 td .lvl{font-size:.74rem;color:var(--muted)}
 .zero{color:var(--line)}
@@ -438,6 +440,7 @@ function compute(eng){
     const pk = /^BOT\b/i.test(r.p) ? (r.p.replace(/\s+[A-Z]{1,3}\d{2,}\b/,"").trim() || "BOT") : r.p; // agrupa os BOTs
     const P=people[pk]||(people[pk]={p:pk,levels:new Set(),rates:new Set(),h:0,v:0,mh:{},mv:{}});
     if(r.l)P.levels.add(r.l); if(r.r)P.rates.add(r.r); P.h+=r.h; P.v+=r.v;
+    if(r.l && (P.lastD==null || (r.d||"")>=P.lastD)){ P.lastD=r.d||""; P.lastL=r.l; if(r.r) P.lastR=r.r; } // cargo mais recente
     if(r.d){const k=r.d.slice(0,7); P.mh[k]=(P.mh[k]||0)+r.h; P.mv[k]=(P.mv[k]||0)+r.v;}
   }
   const desp=ds.exp.reduce((a,e)=>a+e.v,0);
@@ -601,22 +604,41 @@ function renderChart(c){
   box.innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Receita realizada por mês, valor disponível até a data limite e ritmo atual">${g}</svg>`;
 }
 
+const GROUPS = [
+  {k:"socios",  nm:"Sócios e diretores",          re:/partner|s[oó]cio|director|diretor/i},
+  {k:"gerentes",nm:"Gerentes",                     re:/manager|gerente/i},
+  {k:"consult", nm:"Consultores e especialistas",  re:/specialist|consult|analyst|associate|trainee|clerical|technical|assistant|especialista|consultor|analista/i},
+];
+function groupOf(p){
+  if(/^BOT\b/i.test(p.p) || /\bBOT\b/i.test(p.lastL||"")) return {k:"bot",nm:"Automação (BOT)"};
+  for(const g of GROUPS) if(g.re.test(p.lastL||"")) return g;
+  return {k:"outros",nm:"Outros"};
+}
+const GORDER=["socios","gerentes","consult","bot","outros"];
 function renderPeople(c){
-  const rows=c.people.sort((a,b)=>b.v-a.v);
-  const totH=c.hours, totV=c.tab;
   for(const b of ["vRes","vHrs","vRec"]) $(b).setAttribute("aria-pressed", String(({vRes:"res",vHrs:"hrs",vRec:"rec"})[b]===state.view));
-  const who=p=>`<div class="who">${esc(p.p)}</div><div class="lvl">${[...p.levels].map(titleCase).map(esc).join(" → ")||""}</div>`;
+  const totH=c.hours, totV=c.tab;
+  const groups={};
+  for(const p of c.people){ const g=groupOf(p); (groups[g.k]||(groups[g.k]={...g,rows:[],h:0,v:0,mh:{},mv:{}})); const G=groups[g.k]; G.rows.push(p); G.h+=p.h; G.v+=p.v; for(const k in p.mh){G.mh[k]=(G.mh[k]||0)+p.mh[k];} for(const k in p.mv){G.mv[k]=(G.mv[k]||0)+p.mv[k];} }
+  const glist=GORDER.filter(k=>groups[k]).map(k=>groups[k]);
+  glist.forEach(G=>G.rows.sort((a,b)=>b.v-a.v));
+  const who=p=>`<div class="who">${esc(p.p)}</div><div class="lvl">${esc(titleCase(p.lastL||""))}${p.levels.size>1?` <span title="Cargos no período: ${esc([...p.levels].map(titleCase).join(" → "))}">· promovido</span>`:""}</div>`;
+  const rateOf=p=>{ const r=p.lastR||[...p.rates].sort((a,b)=>b-a)[0]||0; return N0.format(r); };
   if(state.view==="res"){
+    const shareCell=v=>{ const sh=totV? v/totV:0; return `<div class="share"><span>${PCT(sh)}</span><span class="sb"><b style="width:${Math.max(0,sh*100)}%"></b></span></div>`; };
     $("people").innerHTML=`<table><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">Horas</th><th class="n">Valor a tabela</th><th class="n">Receita</th><th class="n">% da receita</th></tr></thead><tbody>
-    ${rows.map(p=>{ const sh=totV? p.v/totV:0; return `<tr><td>${who(p)}</td><td class="n">${[...p.rates].sort((a,b)=>a-b).map(r=>N0.format(r)).join(" / ")}</td><td class="n">${N1.format(p.h)}</td><td class="n">${money(p.v)}</td><td class="n">${money(p.v*c.real)}</td><td class="n"><div class="share"><span class="mono">${PCT(sh)}</span><span class="sb"><b style="width:${Math.max(0,sh*100)}%"></b></span></div></td></tr>`; }).join("")}
+    ${glist.map(G=>`<tr class="grp"><td>${esc(G.nm)} <span class="muted" style="font-weight:500">· ${G.rows.length}</span></td><td class="n">${G.h?money(G.v/G.h)+"/h":""}</td><td class="n">${N1.format(G.h)}</td><td class="n">${money(G.v)}</td><td class="n">${money(G.v*c.real)}</td><td class="n">${shareCell(G.v)}</td></tr>`
+      + G.rows.map(p=>`<tr class="ind"><td>${who(p)}</td><td class="n">${rateOf(p)}</td><td class="n">${N1.format(p.h)}</td><td class="n">${money(p.v)}</td><td class="n">${money(p.v*c.real)}</td><td class="n">${shareCell(p.v)}</td></tr>`).join("")).join("")}
     <tr class="tot"><td>Total</td><td class="n">${money(c.blended)}/h médio</td><td class="n">${N1.format(totH)}</td><td class="n">${money(totV)}</td><td class="n">${money(c.receita)}</td><td class="n">100%</td></tr></tbody></table>`;
   } else {
     const months=c.minD? monthsBetween(c.minD.slice(0,7), c.maxD.slice(0,7)) : [];
     const key = state.view==="hrs"? "mh":"mv";
     const f = state.view==="hrs"? (v=>N1.format(v)) : (v=>money(v*c.real));
-    const colTot=months.map(k=>rows.reduce((a,p)=>a+(p[key][k]||0),0));
+    const cell=v=>`<td class="n ${v?"":"zero"}">${v?f(v):"–"}</td>`;
+    const colTot=months.map(k=>glist.reduce((a,G)=>a+(G[key][k]||0),0));
     $("people").innerHTML=`<table><thead><tr><th>Profissional</th>${months.map(k=>`<th class="n">${monthLabel(k)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
-    ${rows.map(p=>`<tr><td>${who(p)}</td>${months.map(k=>{const v=p[key][k]||0; return `<td class="n ${v?"":"zero"}">${v?f(v):"–"}</td>`;}).join("")}<td class="n"><b>${f(state.view==="hrs"?p.h:p.v)}</b></td></tr>`).join("")}
+    ${glist.map(G=>`<tr class="grp"><td>${esc(G.nm)} <span class="muted" style="font-weight:500">· ${G.rows.length}</span></td>${months.map(k=>cell(G[key][k]||0)).join("")}<td class="n">${f(state.view==="hrs"?G.h:G.v)}</td></tr>`
+      + G.rows.map(p=>`<tr class="ind"><td>${who(p)}</td>${months.map(k=>cell(p[key][k]||0)).join("")}<td class="n"><b>${f(state.view==="hrs"?p.h:p.v)}</b></td></tr>`).join("")).join("")}
     <tr class="tot"><td>Total</td>${colTot.map(v=>`<td class="n">${f(v)}</td>`).join("")}<td class="n">${f(state.view==="hrs"?totH:totV)}</td></tr></tbody></table>`;
   }
 }
