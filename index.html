@@ -6,176 +6,184 @@
 <title>Painel Financeiro de Projetos</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-/* Layout: relatório executivo em coluna única. Carteira no topo, título-conclusão, premissas em faixa, figuras numeradas com fonte no rodapé */
+/* Layout: dashboard de largura total. Barra de topo, carteira, cabeçalho do projeto com premissas, 4 KPIs e grade de 12 colunas com gráficos e tabelas */
 :root{
-  --bg:#FFFFFF; --paper:#F4F6FA; --ink:#0B1F33; --muted:#5A6A7E; --line:#D8DEE7; --rule:#0B1F33;
+  --page:#F2F4F8; --card:#FFFFFF; --ink:#0B1F33; --muted:#5A6A7E; --line:#DDE3EB; --rule:#0B1F33;
   --accent:#00338D; --accent-2:#1E49E2; --on-accent:#FFFFFF; --plan:#C3D1EC; --soft:#EDF1F9; --pace:#7213EA;
-  --ok:#1B7A47; --warn:#A15C00; --bad:#B4232F; --bad-soft:#FBEAEC;
-  --f-title:"Source Serif 4",Georgia,"Times New Roman",serif;
+  --ok:#1B7A47; --ok-soft:#E3F3EA; --warn:#A15C00; --warn-soft:#FBF0DD; --bad:#B4232F; --bad-soft:#FBEAEC;
+  --shadow:0 1px 2px rgba(11,31,51,.05);
   --f-body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0A1522; --paper:#0F1D2E; --ink:#E7EDF5; --muted:#9AA9BB; --line:#243447; --rule:#C9D4E3;
-  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#0A1522; --plan:#2A3D63; --soft:#13233A; --pace:#C09BFF;
-  --ok:#5CC98E; --warn:#E8B15A; --bad:#FF8A8A; --bad-soft:#3A1C22;
-  color-scheme:dark }}
+  --page:#08121E; --card:#0F1D2E; --ink:#E7EDF5; --muted:#9AA9BB; --line:#223246; --rule:#C9D4E3;
+  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#08121E; --plan:#2A3D63; --soft:#162841; --pace:#C09BFF;
+  --ok:#5CC98E; --ok-soft:#14301F; --warn:#E8B15A; --warn-soft:#33270F; --bad:#FF8A8A; --bad-soft:#3A1C22;
+  --shadow:none; color-scheme:dark }}
 :root[data-theme="dark"]{
-  --bg:#0A1522; --paper:#0F1D2E; --ink:#E7EDF5; --muted:#9AA9BB; --line:#243447; --rule:#C9D4E3;
-  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#0A1522; --plan:#2A3D63; --soft:#13233A; --pace:#C09BFF;
-  --ok:#5CC98E; --warn:#E8B15A; --bad:#FF8A8A; --bad-soft:#3A1C22;
-  color-scheme:dark }
+  --page:#08121E; --card:#0F1D2E; --ink:#E7EDF5; --muted:#9AA9BB; --line:#223246; --rule:#C9D4E3;
+  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#08121E; --plan:#2A3D63; --soft:#162841; --pace:#C09BFF;
+  --ok:#5CC98E; --ok-soft:#14301F; --warn:#E8B15A; --warn-soft:#33270F; --bad:#FF8A8A; --bad-soft:#3A1C22;
+  --shadow:none; color-scheme:dark }
 
 *{box-sizing:border-box}
 [hidden]{display:none!important}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;font-variant-numeric:tabular-nums;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:28px 56px}
-.wrap{max-width:1160px;margin:0 auto;display:flex;flex-direction:column;gap:36px}
+body{background:var(--page);color:var(--ink);font-family:var(--f-body);font-size:14.5px;line-height:1.45;font-variant-numeric:tabular-nums;
+  padding-left:max(24px,env(safe-area-inset-left,0px));padding-right:max(24px,env(safe-area-inset-right,0px));padding-block:18px 40px}
+@media (max-width:600px){body{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}}
+.wrap{display:flex;flex-direction:column;gap:16px}
 h1,h2,h3{margin:0;text-wrap:balance}
-h1{font-family:var(--f-title);font-weight:600;font-size:1.9rem;line-height:1.15;letter-spacing:-.01em}
-h2.action{font-family:var(--f-title);font-weight:400;font-size:clamp(1.35rem,2.6vw,1.85rem);line-height:1.25;max-width:46ch}
-h2.action b{font-weight:600}
-h3{font-size:1rem;font-weight:700}
-.eyebrow{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:600}
+h1{font-size:1.35rem;font-weight:700;letter-spacing:-.005em}
+h2{font-size:1.3rem;font-weight:700}
+h3{font-size:.95rem;font-weight:700}
+.eyebrow{font-size:.7rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
 .muted{color:var(--muted)}
 .neg{color:var(--bad)}
 button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent-2);outline-offset:2px}
 
 /* topo */
-.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;border-bottom:2px solid var(--rule);padding-bottom:16px}
-.top .id{display:flex;flex-direction:column;gap:4px;min-width:0}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px 16px}
+.top .id{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 14px;min-width:0}
 .actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
-.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:2px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:.88rem}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--card);border-radius:4px;padding:7px 14px;cursor:pointer;font-weight:600;font-size:.86rem}
 .btn:hover{border-color:var(--ink)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .btn.primary:hover{background:var(--accent-2);border-color:var(--accent-2)}
 .btn.link{border:0;padding:0;background:none;color:var(--muted);font-weight:500;font-size:.8rem;text-decoration:underline;text-underline-offset:3px}
 .btn.link.danger{color:var(--bad)}
-.sync{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px;margin-right:6px}
+.sync{font-size:.78rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px;margin-right:4px}
 .sync .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
 .sync.ok{color:var(--ok)} .sync.warn{color:var(--warn)}
 input[type=file]{display:none}
-.notice{padding:10px 14px;font-size:.88rem;border-left:3px solid var(--accent);background:var(--soft)}
+.notice{padding:10px 14px;font-size:.88rem;border-left:3px solid var(--accent);background:var(--soft);border-radius:4px}
 .notice.err{border-left-color:var(--bad);background:var(--bad-soft);color:var(--bad)}
-.drop{border:1px dashed var(--line);padding:40px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.drop{border:1px dashed var(--line);background:var(--card);border-radius:6px;padding:48px 20px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
 .drop.over{border-color:var(--accent);background:var(--soft)}
 
-/* seções */
-.sec{display:flex;flex-direction:column;gap:14px;min-width:0}
-.sec-hd{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:8px 16px;border-bottom:1px solid var(--rule);padding-bottom:8px}
-.sec-hd .ttl{display:flex;flex-direction:column;gap:2px}
-.fig{font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700}
-.source{font-size:.75rem;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+/* grade */
+.dash{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:var(--shadow);padding:16px 18px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.c12{grid-column:span 12} .c8{grid-column:span 8} .c7{grid-column:span 7} .c6{grid-column:span 6} .c5{grid-column:span 5} .c4{grid-column:span 4} .c3{grid-column:span 3}
+@media (max-width:1180px){.c8,.c7,.c5,.c4{grid-column:span 12} .c3{grid-column:span 6}}
+@media (max-width:600px){.c3,.c6{grid-column:span 12}}
+.card-hd{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 14px}
+.card-hd .sub{font-size:.78rem;color:var(--muted)}
+.source{font-size:.75rem;color:var(--muted);margin:0}
 
 /* tabelas */
 .tbl{overflow-x:auto}
-table{border-collapse:collapse;width:100%;font-size:.9rem}
-th{font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;text-align:left;padding:8px 12px;border-bottom:1px solid var(--rule);white-space:nowrap;vertical-align:bottom}
-td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+table{border-collapse:collapse;width:100%;font-size:.88rem}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:bottom;background:var(--card)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr:last-child td{border-bottom:0}
 th.n,td.n{text-align:right;white-space:nowrap}
 tr.tot td{font-weight:700;border-bottom:0;border-top:1px solid var(--rule)}
 td .who{font-weight:600}
-td .lvl{font-size:.75rem;color:var(--muted)}
+td .lvl{font-size:.74rem;color:var(--muted)}
 .zero{color:var(--line)}
 th.hl,td.hl{background:var(--soft)}
 
 /* carteira */
-.port tbody tr{cursor:pointer}
-.port tbody tr:hover td{background:var(--paper)}
+.port tbody tr[data-eng]{cursor:pointer}
+.port tbody tr[data-eng]:hover td{background:var(--soft)}
 .port tbody tr.sel td{background:var(--soft)}
 .port tbody tr.sel td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.port td:first-child{min-width:240px}
 .port .pn{font-weight:700}
-.port td:first-child{min-width:220px}
-.port .pc{font-size:.78rem;color:var(--muted)}
-.st{display:inline-flex;align-items:center;gap:6px;font-size:.8rem;font-weight:600;white-space:nowrap}
-.st i{width:8px;height:8px;display:inline-block}
-.st.ok{color:var(--ok)} .st.ok i{background:var(--ok)}
-.st.warn{color:var(--warn)} .st.warn i{background:var(--warn)}
-.st.bad{color:var(--bad)} .st.bad i{background:var(--bad)}
-.st.plain{color:var(--muted)} .st.plain i{background:var(--line)}
+.port .pc{font-size:.76rem;color:var(--muted)}
+.port .barcell{width:18%;min-width:140px}
+.mini{height:6px;background:var(--soft);position:relative;border-radius:3px}
+.mini b{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
+.mini b.over{background:var(--bad)}
+.mini i{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.st{display:inline-flex;align-items:center;gap:6px;font-size:.76rem;font-weight:700;white-space:nowrap;padding:2px 8px;border-radius:999px}
+.st i{width:6px;height:6px;border-radius:50%;display:inline-block;background:currentColor}
+.st.ok{color:var(--ok);background:var(--ok-soft)}
+.st.warn{color:var(--warn);background:var(--warn-soft)}
+.st.bad{color:var(--bad);background:var(--bad-soft)}
+.st.plain{color:var(--muted);background:var(--soft)}
 
-/* projeto */
-.proj-hd{display:flex;flex-direction:column;gap:10px}
-.proj-hd .sub{font-size:1rem;color:var(--muted);max-width:75ch}
-.assume{display:grid;grid-template-columns:120px minmax(180px,1.2fr) 170px minmax(190px,1fr);gap:14px 18px;align-items:end;background:var(--paper);padding:14px 16px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-@media (max-width:900px){.assume{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (max-width:460px){.assume{grid-template-columns:minmax(0,1fr)}}
+/* cabeçalho do projeto */
+.proj{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px 28px}
+.proj .who{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1 1 380px}
+.proj .nm{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.proj .insight{font-size:.92rem;color:var(--muted);max-width:90ch}
+.proj .insight b{color:var(--ink)}
+.assume{display:flex;flex-wrap:wrap;gap:12px 14px;align-items:flex-end}
 .field{display:flex;flex-direction:column;gap:4px;min-width:0}
-.field label,.field .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
-.field .hint{font-size:.72rem;color:var(--muted)}
-.inp{display:flex;align-items:center;border:1px solid var(--line);background:var(--bg);min-width:0}
+.field label{font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.inp{display:flex;align-items:center;border:1px solid var(--line);background:var(--page);border-radius:4px;min-width:0}
 .inp:focus-within{border-color:var(--accent)}
-.inp span{padding:0 8px;color:var(--muted);font-size:.85rem}
-.inp input{border:0;background:transparent;padding:7px 8px;width:100%;min-width:0;font-size:.95rem;outline:none}
-.valrow{display:flex;gap:6px;min-width:0}
-.valrow .inp{flex:1}
-.seg{display:inline-flex;border:1px solid var(--line);background:var(--bg)}
-.seg button{border:0;background:transparent;padding:6px 10px;font-size:.8rem;cursor:pointer;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg);font-weight:600}
-.check{display:flex;gap:8px;align-items:center;font-size:.85rem;cursor:pointer;padding-bottom:7px}
+.inp span{padding:0 8px;color:var(--muted);font-size:.82rem}
+.inp input{border:0;background:transparent;padding:6px 8px;width:100%;min-width:0;font-size:.92rem;outline:none}
+.f-real{width:100px} .f-val{width:200px} .f-prazo{width:160px}
+.check{display:flex;gap:8px;align-items:center;font-size:.84rem;cursor:pointer;padding-bottom:6px}
 .check input{accent-color:var(--accent)}
-.assume-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px 16px;font-size:.75rem;color:var(--muted)}
+.proj-foot{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 16px;font-size:.74rem;color:var(--muted);border-top:1px solid var(--line);padding-top:10px}
 
 /* KPIs */
-.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--rule);border-bottom:1px solid var(--line)}
-.kpi{padding:16px 18px 18px;display:flex;flex-direction:column;gap:4px;min-width:0;border-left:1px solid var(--line)}
-.kpi:first-child{border-left:0;padding-left:0}
-.kpi .v{font-size:2rem;font-weight:600;line-height:1.1;letter-spacing:-.01em;overflow-wrap:anywhere}
-.kpi .s{font-size:.8rem;color:var(--muted)}
+.kpi{gap:4px}
+.kpi .v{font-size:1.85rem;font-weight:700;line-height:1.1;letter-spacing:-.01em;overflow-wrap:anywhere}
+.kpi .s{font-size:.78rem;color:var(--muted)}
+.kpi.key{border-top:3px solid var(--accent)}
 .kpi.key .v{color:var(--accent)}
-@media (max-width:900px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}.kpi:nth-child(3){border-left:0;padding-left:0}.kpi:nth-child(n+3){border-top:1px solid var(--line)}}
-@media (max-width:460px){.kpis{grid-template-columns:minmax(0,1fr)}.kpi{border-left:0;padding-left:0}.kpi+.kpi{border-top:1px solid var(--line)}}
+.kpi.neg .v{color:var(--bad)}
 
 /* consumo */
-.burnrow{display:grid;grid-template-columns:minmax(0,1fr);gap:10px}
-.bar{position:relative;height:18px;background:var(--soft)}
-.bar .fill{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.bar{position:relative;height:16px;background:var(--soft);border-radius:3px}
+.bar .fill{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
 .bar .fill.over{background:var(--bad)}
 .bar .mark{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink)}
-.scale{display:flex;justify-content:space-between;font-size:.75rem;color:var(--muted)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:.82rem;color:var(--muted)}
-.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px}
-.legend b{color:var(--ink);font-weight:600}
+.scale{display:flex;justify-content:space-between;font-size:.74rem;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-top:1px solid var(--line)}
+.stats > div{padding:10px 0;display:flex;flex-direction:column;gap:2px;border-bottom:1px solid var(--line)}
+.stats > div:nth-child(odd){padding-right:12px;border-right:1px solid var(--line)}
+.stats > div:nth-child(even){padding-left:12px}
+.stats > div:nth-last-child(-n+2){border-bottom:0}
+.stats b{font-size:1.15rem;font-weight:700}
+.stats span{font-size:.74rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:4px 18px;font-size:.78rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;margin-right:6px;vertical-align:-1px;border-radius:2px}
 
 /* gráfico */
 .chart{width:100%;overflow-x:auto}
 .chart svg{display:block}
 .chart text{font-family:var(--f-body);font-size:12px;fill:var(--muted)}
-.chart .vl{fill:var(--ink);font-weight:600}
-.chart .pl{fill:var(--pace);font-weight:600}
+.chart .vl{fill:var(--ink);font-weight:700}
+.chart .pl{fill:var(--pace);font-weight:700}
 
 /* profissionais e despesas */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:4px;overflow:hidden;background:var(--card)}
+.seg button{border:0;background:transparent;padding:5px 10px;font-size:.78rem;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--card);font-weight:600}
 .share{display:flex;align-items:center;gap:8px;justify-content:flex-end}
-.share .sb{width:80px;height:6px;background:var(--soft);position:relative;flex:0 0 auto}
-.share .sb b{position:absolute;inset:0 auto 0 0;background:var(--accent)}
-.cats{display:flex;flex-direction:column;gap:8px}
-.cat{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr) auto;gap:12px;align-items:center;font-size:.88rem}
+.share .sb{width:70px;height:6px;background:var(--soft);position:relative;flex:0 0 auto;border-radius:3px}
+.share .sb b{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
+.cats{display:flex;flex-direction:column;gap:7px}
+.cat{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:.85rem}
 .cat .nm{min-width:0}
-.cat .tr{height:8px;background:var(--soft);position:relative}
-.cat .tr b{position:absolute;inset:0 auto 0 0;background:var(--accent)}
+.cat .tr{height:7px;background:var(--soft);position:relative;border-radius:3px}
+.cat .tr b{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
 @media (max-width:520px){.cat{grid-template-columns:minmax(0,1fr) auto}.cat .tr{grid-column:1/-1;grid-row:2}}
-.split{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:32px}
-@media (max-width:760px){.split{grid-template-columns:minmax(0,1fr)}}
-.mchips{display:flex;flex-wrap:wrap;gap:0;border:1px solid var(--line);width:max-content;max-width:100%}
-.mchip{display:flex;flex-direction:column;align-items:flex-start;gap:0;border:0;border-left:1px solid var(--line);background:var(--bg);padding:8px 14px;cursor:pointer;font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.mchips{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:4px;overflow:hidden;width:max-content;max-width:100%}
+.mchip{display:flex;flex-direction:column;align-items:flex-start;border:0;border-left:1px solid var(--line);background:var(--card);padding:6px 12px;cursor:pointer;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
 .mchip:first-child{border-left:0}
-.mchip b{font-size:.95rem;color:var(--ink);font-weight:600;text-transform:none;letter-spacing:0}
-.mchip[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
-.mchip[aria-pressed="true"] b{color:var(--bg)}
+.mchip b{font-size:.92rem;color:var(--ink);font-weight:700;text-transform:none;letter-spacing:0}
+.mchip[aria-pressed="true"]{background:var(--ink);color:var(--card)}
+.mchip[aria-pressed="true"] b{color:var(--card)}
 .cn{display:block}
-.co{display:block;font-size:.72rem;color:var(--muted)}
+.co{display:block;font-size:.7rem;color:var(--muted)}
 dt .co{display:inline;margin-left:6px}
-.glos dl{margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px 28px}
-.glos dt{font-weight:600;font-size:.88rem}
-.glos dd{margin:2px 0 0;font-size:.82rem;color:var(--muted)}
-#expenses{display:flex;flex-direction:column;gap:22px}
-details summary{cursor:pointer;font-weight:600;font-size:.88rem;color:var(--accent)}
+.glos dl{margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px 28px}
+.glos dt{font-weight:600;font-size:.86rem}
+.glos dd{margin:2px 0 0;font-size:.8rem;color:var(--muted)}
+details summary{cursor:pointer;font-weight:600;font-size:.86rem;color:var(--accent)}
 details[open] summary{margin-bottom:10px}
 .confirm{display:inline-flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.8rem}
-@media (prefers-reduced-motion:no-preference){.bar .fill,.share .sb b,.cat .tr b{transition:width .35s ease}}
+@media (prefers-reduced-motion:no-preference){.bar .fill,.share .sb b,.cat .tr b,.mini b{transition:width .35s ease}}
 </style>
 
 <style>html,body{margin:0} img{max-width:100%}</style>
@@ -184,8 +192,8 @@ details[open] summary{margin-bottom:10px}
 <div class="wrap">
   <header class="top">
     <div class="id">
-      <span class="eyebrow" id="asof">Gestão financeira de engagements</span>
       <h1>Painel Financeiro de Projetos</h1>
+      <span class="eyebrow" id="asof">Gestão financeira de engagements</span>
     </div>
     <div class="actions">
       <span id="syncChip" class="sync"><span class="dot"></span><span id="syncTxt">Conectando…</span></span>
@@ -198,58 +206,50 @@ details[open] summary{margin-bottom:10px}
   <div id="msg" hidden></div>
 
   <section id="empty" class="drop" hidden>
-    <h2 class="action" style="max-width:none">Importe a planilha de horas e despesas</h2>
+    <h2>Importe a planilha de horas e despesas</h2>
     <p class="muted" style="margin:0;max-width:62ch">Use o arquivo exportado com as abas TIME e EXPENSE (.xls ou .xlsx). O painel separa cada engagement e calcula horas, valor a tabela, receita pela realização e o saldo até a data limite.</p>
     <label class="btn primary" for="file">Escolher planilha</label>
   </section>
 
-  <section class="sec" id="portSec" hidden>
-    <div class="sec-hd"><div class="ttl"><span class="eyebrow">Carteira</span><h3>Projetos na planilha</h3></div><span class="muted" style="font-size:.8rem">Clique num projeto para ver o detalhe</span></div>
-    <div class="tbl"><table class="port"><thead><tr><th>Projeto</th><th class="n">Realização</th><th class="n">Receita</th><th class="n">Saldo líquido</th><th class="n">Disponível/mês</th><th class="n">Data limite</th><th>Situação</th></tr></thead><tbody id="tabs"></tbody></table></div>
-  </section>
-
-  <div id="main" hidden style="display:flex;flex-direction:column;gap:36px">
-    <section class="proj-hd">
-      <span class="eyebrow" id="pEyebrow"></span>
-      <h2 class="action" id="action"></h2>
-      <p class="sub" id="actionSub" style="margin:0"></p>
+  <div class="dash" id="dash" hidden>
+    <section class="card c12" aria-label="Carteira">
+      <div class="card-hd"><h3>Carteira de projetos</h3><span class="sub">Clique num projeto para ver o detalhe</span></div>
+      <div class="tbl"><table class="port"><thead><tr><th>Projeto</th><th class="n">Realização</th><th class="n">Receita</th><th class="n">Valor líquido</th><th class="n">Saldo líquido</th><th>Consumo × prazo</th><th class="n">Disponível/mês</th><th class="n">Data limite</th><th>Situação</th></tr></thead><tbody id="tabs"></tbody></table></div>
     </section>
 
-    <section class="sec" aria-label="Premissas">
-      <div class="assume">
-        <div class="field">
-          <label for="inReal">Realização</label>
-          <div class="inp"><input id="inReal" type="number" inputmode="decimal" min="0" max="200" step="0.1"><span>%</span></div>
+    <section class="card c12" aria-label="Projeto selecionado">
+      <div class="proj">
+        <div class="who">
+          <span class="eyebrow" id="pEyebrow"></span>
+          <div class="nm"><h2 id="pName"></h2><span id="pStatus"></span></div>
+          <div class="insight" id="action"></div>
         </div>
-        <div class="field">
-          <label for="inValor">Valor líquido do projeto</label>
-          <div class="inp"><span>R$</span><input id="inValor" type="text" inputmode="decimal" placeholder="0,00"></div>
+        <div class="assume" aria-label="Premissas">
+          <div class="field f-real"><label for="inReal">Realização</label><div class="inp"><input id="inReal" type="number" inputmode="decimal" min="0" max="200" step="0.1"><span>%</span></div></div>
+          <div class="field f-val"><label for="inValor">Valor líquido do projeto</label><div class="inp"><span>R$</span><input id="inValor" type="text" inputmode="decimal" placeholder="0,00"></div></div>
+          <div class="field f-prazo"><label for="inPrazo">Data limite</label><div class="inp"><input id="inPrazo" type="month"></div></div>
+          <label class="check"><input id="inDesp" type="checkbox"><span>Descontar despesas do saldo</span></label>
         </div>
-        <div class="field">
-          <label for="inPrazo">Data limite</label>
-          <div class="inp"><input id="inPrazo" type="month"></div>
-        </div>
-        <label class="check"><input id="inDesp" type="checkbox"><span>Descontar despesas do saldo</span></label>
       </div>
-      <div class="assume-foot"><span id="liqHint"></span><span id="pMeta"></span><span id="rmBox"></span></div>
+      <div class="proj-foot"><span id="liqHint"></span><span id="pMeta"></span><span id="rmBox"></span></div>
     </section>
 
-    <div class="kpis" id="kpis"></div>
+    <div class="c12 dash" id="kpis" style="gap:16px"></div>
 
-    <section class="sec" aria-label="Consumo do orçamento">
-      <div class="sec-hd"><div class="ttl"><span class="fig">Figura 1</span><h3>Consumo do orçamento líquido comparado ao prazo</h3></div></div>
-      <div class="burnrow" id="burn"></div>
-    </section>
-
-    <section class="sec" aria-label="Receita por mês">
-      <div class="sec-hd"><div class="ttl"><span class="fig">Figura 2</span><h3>Receita realizada e disponível por mês, R$</h3></div>
+    <section class="card c8" aria-label="Receita por mês">
+      <div class="card-hd"><h3>Receita realizada e disponível por mês</h3>
         <div class="legend"><span><i style="background:var(--accent)"></i>Realizada</span><span><i style="background:var(--plan)"></i>Disponível até a data limite</span><span><i style="background:var(--pace);height:2px;vertical-align:3px"></i>Ritmo das últimas 4 semanas</span></div>
       </div>
       <div class="chart" id="chart"></div>
     </section>
 
-    <section class="sec" aria-label="Profissionais">
-      <div class="sec-hd"><div class="ttl"><span class="fig">Figura 3</span><h3>Horas e receita por profissional</h3></div>
+    <section class="card c4" aria-label="Consumo do orçamento">
+      <div class="card-hd"><h3>Consumo do orçamento</h3></div>
+      <div id="burn" style="display:flex;flex-direction:column;gap:10px"></div>
+    </section>
+
+    <section class="card c7" aria-label="Profissionais">
+      <div class="card-hd"><h3>Profissionais</h3>
         <div class="seg" role="group" aria-label="Visão">
           <button id="vRes" aria-pressed="true">Resumo</button>
           <button id="vHrs" aria-pressed="false">Horas por mês</button>
@@ -259,12 +259,17 @@ details[open] summary{margin-bottom:10px}
       <div class="tbl" id="people"></div>
     </section>
 
-    <section class="sec" aria-label="Despesas">
-      <div class="sec-hd"><div class="ttl"><span class="fig">Figura 4</span><h3>Despesas por mês e por tipo</h3></div><span class="muted" id="expSum" style="font-size:.85rem"></span></div>
-      <div id="expenses"></div>
+    <section class="card c5" aria-label="Resumo de despesas">
+      <div class="card-hd"><h3>Despesas</h3><span class="sub" id="expSum"></span></div>
+      <div id="expSide" style="display:flex;flex-direction:column;gap:16px"></div>
     </section>
 
-    <p class="source" id="source"></p>
+    <section class="card c12" aria-label="Despesas por mês">
+      <div class="card-hd"><h3>Despesas por tipo e mês</h3><span class="sub">Valores por mês do lançamento</span></div>
+      <div id="expenses" style="display:flex;flex-direction:column;gap:14px"></div>
+    </section>
+
+    <p class="source c12" id="source"></p>
   </div>
 </div>
 
@@ -465,55 +470,53 @@ function compute(eng){
 /* ---------- renderização ---------- */
 const MESL=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const mesAno = k => { if(!k) return "—"; const [y,m]=k.split("-"); return `${MESL[+m-1]} de ${y}`; };
-const mil = v => (v==null||!isFinite(v)) ? "—" : "R$ "+compact(v);
 function renderAll(){
   const engs=Object.keys(state.datasets).sort((a,b)=>(state.datasets[a].desc||"").localeCompare(state.datasets[b].desc||""));
   $("empty").hidden = engs.length>0;
-  $("main").hidden = engs.length===0;
-  $("portSec").hidden = engs.length===0;
-  $("asof").textContent = `Gestão financeira de engagements · posição de ${new Date().toLocaleDateString("pt-BR")}`;
+  $("dash").hidden = engs.length===0;
+  $("asof").textContent = `Posição de ${new Date().toLocaleDateString("pt-BR")}`;
   if(!engs.length){ $("tabs").innerHTML=""; return; }
   if(!state.sel || !state.datasets[state.sel]) state.sel=engs[0];
   renderPortfolio(engs);
   renderParams(); renderDetail();
 }
 function renderPortfolio(engs){
-  engs = engs || [...$("tabs").querySelectorAll("tr")].map(r=>r.dataset.eng);
+  engs = engs || [...$("tabs").querySelectorAll("tr[data-eng]")].map(r=>r.dataset.eng);
   const rows=engs.map(e=>{ const c=compute(e); return {e,c,st:statusOf(c)}; });
-  const tot=rows.reduce((a,r)=>({rec:a.rec+(r.c.s.real==null?0:r.c.receita), sal:a.sal+(r.c.saldo||0)}),{rec:0,sal:0});
-  $("tabs").innerHTML = rows.map(({e,c,st})=>`<tr data-eng="${esc(e)}" class="${e===state.sel?"sel":""}" tabindex="0" aria-selected="${e===state.sel}">
+  const tot=rows.reduce((a,r)=>({rec:a.rec+(r.c.s.real==null?0:r.c.receita), val:a.val+(r.c.valor||0), sal:a.sal+(r.c.saldo||0), mes:a.mes+(r.c.saldoMes||0)}),{rec:0,val:0,sal:0,mes:0});
+  $("tabs").innerHTML = rows.map(({e,c,st})=>{
+    const used = c.valor>0 ? c.consumo/c.valor : null;
+    return `<tr data-eng="${esc(e)}" class="${e===state.sel?"sel":""}" tabindex="0" aria-selected="${e===state.sel}">
       <td><div class="pn">${esc(c.ds.desc||e)}</div><div class="pc">${esc(titleCase(c.ds.client))} · Eng. ${esc(e)}</div></td>
       <td class="n">${c.s.real==null?"—":N1.format(c.s.real)+"%"}</td>
       <td class="n">${c.s.real==null?"—":money(c.receita)}</td>
+      <td class="n">${money(c.valor)}</td>
       <td class="n ${c.saldo!=null&&c.saldo<0?"neg":""}"><b>${money(c.saldo)}</b></td>
+      <td class="barcell">${used==null?'<span class="muted">—</span>':`<div class="mini" title="${PCT(used)} consumido · ${c.elapsed!=null?PCT(c.elapsed)+" do prazo":""}"><b class="${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></b>${c.elapsed!=null?`<i style="left:calc(${c.elapsed*100}% - 1px)"></i>`:""}</div><div class="pc" style="margin-top:4px">${PCT(used)} consumido${c.elapsed!=null?` · ${PCT(c.elapsed)} do prazo`:""}</div>`}</td>
       <td class="n">${money(c.saldoMes)}</td>
       <td class="n">${c.s.prazo? monthLabel(c.s.prazo):"—"}</td>
-      <td><span class="st ${st.cls}"><i></i>${esc(st.short)}</span></td></tr>`).join("")
-    + (rows.length>1? `<tr class="tot" style="cursor:default"><td>Total da carteira</td><td></td><td class="n">${money(tot.rec)}</td><td class="n">${money(tot.sal)}</td><td></td><td></td><td></td></tr>`:"");
+      <td><span class="st ${st.cls}"><i></i>${esc(st.short)}</span></td></tr>`;
+  }).join("")
+    + (rows.length>1? `<tr class="tot"><td>Total da carteira</td><td></td><td class="n">${money(tot.rec)}</td><td class="n">${money(tot.val)}</td><td class="n">${money(tot.sal)}</td><td></td><td class="n">${money(tot.mes)}</td><td></td><td></td></tr>`:"");
 }
 function statusOf(c){
-  if(c.s.real==null) return {cls:"plain",short:"Sem realização",long:"Informe a realização para calcular a receita."};
-  if(c.valor==null) return {cls:"plain",short:"Sem valor",long:"Informe o valor final do projeto para calcular o saldo."};
-  if(c.saldo<0) return {cls:"bad",short:"Estourado",long:`Orçamento estourado em ${money(-c.saldo)}.`};
-  if(c.monthsLeft===0) return {cls:"warn",short:"Prazo vencido",long:"A data limite já passou."};
-  if(c.runOut && c.end && c.runOut<c.end) return {cls:"warn",short:"Atenção ao ritmo",long:`No ritmo atual o saldo acaba em ${fmtDate(isoDate(c.runOut))}.`};
-  return {cls:"ok",short:"No orçamento",long:"O saldo cobre o ritmo atual até a data limite."};
+  if(c.s.real==null) return {cls:"plain",short:"Sem realização"};
+  if(c.valor==null) return {cls:"plain",short:"Sem valor"};
+  if(c.saldo<0) return {cls:"bad",short:"Estourado"};
+  if(c.monthsLeft===0) return {cls:"warn",short:"Prazo vencido"};
+  if(c.runOut && c.end && c.runOut<c.end) return {cls:"warn",short:"Atenção ao ritmo"};
+  return {cls:"ok",short:"No orçamento"};
 }
-function actionTitle(c){
-  const nm=esc(c.ds.desc||c.ds.eng);
-  if(c.s.real==null||c.valor==null) return {t:`Informe as premissas de <b>${nm}</b> para calcular o saldo.`, s:"Preencha a realização, o valor final do projeto e a data limite na faixa abaixo."};
-  if(c.saldo<0) return {t:`<b>${nm}</b> estourou o orçamento líquido em <b>${money(-c.saldo)}</b>.`, s:`A receita reconhecida (${money(c.consumo)}) já passou do valor líquido do projeto (${money(c.valor)}).`};
-  if(!c.monthsLeft) return {t:`<b>${nm}</b> tem <b>${money(c.saldo)}</b> de saldo, mas a data limite já passou.`, s:"Atualize a data limite para ver o valor disponível por mês."};
-  const t=`<b>${nm}</b> tem <b>${money(c.saldo)}</b> de saldo líquido, ou <b>${money(c.saldoMes)} por mês</b> até ${mesAno(c.s.prazo)}.`;
-  let s;
-  if(!(c.ritmo>0)) s="Não houve horas lançadas nas últimas 4 semanas.";
-  else {
-    const r=c.ritmo/c.saldoMes;
-    if(r>1.1) s=`O ritmo das últimas 4 semanas, ${money(c.ritmo)} por mês, está ${N0.format((r-1)*100)}% acima do disponível. Nesse ritmo o saldo acaba em ${fmtDate(isoDate(c.runOut))}, antes do prazo.`;
-    else if(r<0.9) s=`O ritmo das últimas 4 semanas, ${money(c.ritmo)} por mês, usa ${N0.format(r*100)}% do disponível. Há espaço para alocar cerca de ${N0.format(c.horasMes - c.horasMes*r)} horas a mais por mês.`;
-    else s=`O ritmo das últimas 4 semanas, ${money(c.ritmo)} por mês, está alinhado ao disponível.`;
-  }
-  return {t,s};
+function insight(c){
+  if(c.s.real==null||c.valor==null) return "Preencha a realização, o valor líquido e a data limite ao lado para calcular o saldo.";
+  if(c.saldo<0) return `Orçamento estourado em <b>${money(-c.saldo)}</b>: a receita reconhecida (${money(c.consumo)}) passou do valor líquido (${money(c.valor)}).`;
+  if(!c.monthsLeft) return `Saldo de <b>${money(c.saldo)}</b>, mas a data limite já passou.`;
+  let t=`Saldo de <b>${money(c.saldo)}</b> cobre <b>${money(c.saldoMes)} por mês</b> até ${mesAno(c.s.prazo)}.`;
+  if(!(c.ritmo>0)) return t+" Sem horas lançadas nas últimas 4 semanas.";
+  const r=c.ritmo/c.saldoMes;
+  if(r>1.1) return t+` O ritmo atual (${money(c.ritmo)}/mês) está <b class="neg">${N0.format((r-1)*100)}% acima</b> do disponível. Nesse ritmo o saldo acaba em ${fmtDate(isoDate(c.runOut))}.`;
+  if(r<0.9) return t+` O ritmo atual (${money(c.ritmo)}/mês) usa <b>${N0.format(r*100)}%</b> do disponível, com espaço para cerca de ${N0.format(c.horasMes*(1-r))} h a mais por mês.`;
+  return t+` O ritmo atual (${money(c.ritmo)}/mês) está alinhado ao disponível.`;
 }
 function renderParams(){
   const e=state.sel, s=getSet(e), ds=state.datasets[e];
@@ -524,18 +527,20 @@ function renderParams(){
   $("inDesp").checked = !!s.deduzir;
   $("liqHint").textContent = "Valores líquidos de impostos · Receita = charge-out rate × horas × realização";
   $("pEyebrow").textContent = `${titleCase(ds.client)} · Engagement ${e}`;
+  $("pName").textContent = ds.desc || e;
   const imp = ds.importedAt? new Date(ds.importedAt) : null;
   $("pMeta").textContent = `Arquivo ${ds.fileName||"—"} · importado em ${imp? imp.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"—"}`;
   $("rmBox").innerHTML = `<button class="btn link danger" id="rmBtn">Remover projeto do painel</button>`;
 }
-function kpi(label,value,sub,cls=""){ return `<div class="kpi ${cls}"><span class="eyebrow">${label}</span><span class="v">${value}</span><span class="s">${sub}</span></div>`; }
+function kpi(label,value,sub,cls=""){ return `<div class="card kpi c3 ${cls}"><span class="eyebrow">${label}</span><span class="v">${value}</span><span class="s">${sub}</span></div>`; }
 function renderDetail(){
-  const c=compute(state.sel);
-  const a=actionTitle(c); $("action").innerHTML=a.t; $("actionSub").textContent=a.s;
+  const c=compute(state.sel); const st=statusOf(c);
+  $("pStatus").innerHTML=`<span class="st ${st.cls}"><i></i>${esc(st.short)}</span>`;
+  $("action").innerHTML=insight(c);
   const mesesTxt = c.monthsLeft==null? "Defina a data limite" : c.monthsLeft===0? "Prazo encerrado" : `${N1.format(c.monthsLeft)} meses até ${fmtDate(isoDate(c.end))}`;
   $("kpis").innerHTML =
-    kpi("Receita reconhecida", c.s.real==null? "—" : money(c.receita), `${N1.format(c.hours)} h · ${money(c.tab)} a tabela`) +
-    kpi("Saldo líquido", money(c.saldo), c.valor==null? "Informe o valor do projeto" : `${c.valor>0?PCT(Math.max(0,c.saldo)/c.valor):"—"} de ${money(c.valor)}`, (c.saldo!=null&&c.saldo<0?"neg ":"")+"key") +
+    kpi("Receita reconhecida", c.s.real==null? "—" : money(c.receita), `${N1.format(c.hours)} h · ${money(c.tab)} a tabela × ${c.s.real==null?"—":N1.format(c.s.real)+"%"}`) +
+    kpi("Saldo líquido", money(c.saldo), c.valor==null? "Informe o valor do projeto" : `${c.valor>0?PCT(Math.max(0,c.saldo)/c.valor):"—"} de ${money(c.valor)}${c.s.deduzir?" · despesas descontadas":""}`, (c.saldo!=null&&c.saldo<0?"neg ":"")+"key") +
     kpi("Disponível por mês", c.saldoMes==null? "—" : money(c.saldoMes), c.horasMes!=null && c.saldoMes>0 ? `${mesesTxt} · ~${N0.format(c.horasMes)} h/mês` : mesesTxt) +
     kpi("Despesas", money(c.desp), `${c.ds.exp.length} lançamentos · ${c.s.deduzir?"descontadas do saldo":"fora do saldo"}`);
   if(c.valor!=null && c.valor>0){
@@ -544,19 +549,23 @@ function renderDetail(){
     $("burn").innerHTML = `
       <div class="bar" role="img" aria-label="${PCT(used)} do orçamento consumido">
         <div class="fill ${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></div>
-        ${c.elapsed!=null? `<div class="mark" style="left:calc(${c.elapsed*100}% - 1px)"></div>`:""}
+        ${c.elapsed!=null? `<div class="mark" style="left:calc(${c.elapsed*100}% - 1px)" title="Prazo decorrido"></div>`:""}
       </div>
-      <div class="scale"><span>0</span><span>${money(c.valor)} líquido</span></div>
-      <div class="legend">
-        <span><i style="background:var(--accent)"></i><b>${PCT(used)}</b> do orçamento consumido (${money(c.consumo)})</span>
-        ${c.elapsed!=null? `<span><i style="background:var(--ink);width:2px"></i><b>${PCT(c.elapsed)}</b> do prazo decorrido, de ${fmtDate(c.minD)} a ${fmtDate(isoDate(c.end))}</span>`:""}
-        ${gap!=null? `<span>${gap<=0? `Consumo <b>${N0.format(-gap*100)} p.p. abaixo</b> do tempo decorrido` : `Consumo <b class="neg">${N0.format(gap*100)} p.p. acima</b> do tempo decorrido`}</span>`:""}
+      <div class="scale"><span>R$ 0</span><span>${money(c.valor)}</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>Consumido</span><span><i style="background:var(--ink);width:2px"></i>Prazo decorrido</span></div>
+      <div class="stats">
+        <div><b>${PCT(used)}</b><span>do orçamento consumido</span></div>
+        <div><b>${c.elapsed!=null?PCT(c.elapsed):"—"}</b><span>do prazo decorrido</span></div>
+        <div><b class="${gap>0?"neg":""}">${gap==null?"—":(gap<=0?"−":"+")+N0.format(Math.abs(gap)*100)+" p.p."}</b><span>consumo ${gap!=null&&gap>0?"acima":"abaixo"} do prazo</span></div>
+        <div><b>${c.ritmo>0?money(c.ritmo):"—"}</b><span>ritmo/mês (últimas 4 sem.)</span></div>
+        <div><b>${money(c.blended)}</b><span>valor/hora médio a tabela</span></div>
+        <div><b>${c.runOut? fmtDate(isoDate(c.runOut)) : "—"}</b><span>saldo acaba no ritmo atual</span></div>
       </div>`;
   } else {
-    $("burn").innerHTML = `<div class="notice">Informe o valor final do projeto nas premissas para ver o consumo do orçamento.</div>`;
+    $("burn").innerHTML = `<div class="notice">Informe o valor líquido do projeto para ver o consumo do orçamento.</div>`;
   }
   const ds=c.ds; const imp=ds.importedAt? new Date(ds.importedAt).toLocaleDateString("pt-BR") : "—";
-  $("source").textContent = `Fonte: exportação de horas e despesas (${ds.fileName||"planilha"}), importada em ${imp}; lançamentos de ${fmtDate(c.minD)} a ${fmtDate(c.maxD)}. Receita = charge-out rate × horas × realização. Valor/hora médio a tabela: ${money(c.blended)}. Ritmo = receita das últimas 4 semanas convertida para mês.`;
+  $("source").textContent = `Fonte: exportação de horas e despesas (${ds.fileName||"planilha"}), importada em ${imp}; lançamentos de ${fmtDate(c.minD)} a ${fmtDate(c.maxD)}. Receita = charge-out rate × horas × realização. Ritmo = receita das últimas 4 semanas convertida para mês. Valores líquidos de impostos.`;
   renderChart(c); renderPeople(c); renderExpenses(c);
 }
 
@@ -571,19 +580,19 @@ function renderChart(c){
     if(allow && c.s.prazo && k>=c.curM && k<=c.s.prazo) plan = k===c.curM ? allow*c.frac : allow;
     return {k,act,plan};
   });
-  const box=$("chart"); const W=Math.max(box.clientWidth||600, months.length*56); const H=260;
-  const m={t:26,r:110,b:30,l:8};
+  const box=$("chart"); const W=Math.max(box.clientWidth||600, months.length*56); const H=280;
+  const m={t:24,r:100,b:30,l:8};
   const pace=c.ritmo>0? c.ritmo : 0;
   const max=Math.max(1,pace,...data.map(d=>d.act+d.plan));
   const y=v=>m.t+(H-m.t-m.b)*(1-v/(max*1.08));
-  const bw=(W-m.l-m.r)/data.length; const w=Math.min(52,bw*0.6);
+  const bw=(W-m.l-m.r)/data.length; const w=Math.min(64,bw*0.6);
   let g=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--rule)" stroke-width="1"/>`;
   data.forEach((d,i)=>{
     const x=m.l+bw*i+(bw-w)/2;
-    if(d.act>0) g+=`<rect x="${x}" y="${y(d.act)}" width="${w}" height="${y(0)-y(d.act)}" fill="var(--accent)"><title>${monthLabel(d.k)} · realizada ${money(d.act)}</title></rect>`;
-    if(d.plan>0) g+=`<rect x="${x}" y="${y(d.act+d.plan)}" width="${w}" height="${y(d.act)-y(d.act+d.plan)}" fill="var(--plan)"><title>${monthLabel(d.k)} · disponível ${money(d.plan)}</title></rect>`;
+    if(d.act>0) g+=`<rect x="${x}" y="${y(d.act)}" width="${w}" height="${y(0)-y(d.act)}" fill="var(--accent)" rx="2"><title>${monthLabel(d.k)} · realizada ${money(d.act)}</title></rect>`;
+    if(d.plan>0) g+=`<rect x="${x}" y="${y(d.act+d.plan)}" width="${w}" height="${y(d.act)-y(d.act+d.plan)}" fill="var(--plan)" rx="2"><title>${monthLabel(d.k)} · disponível ${money(d.plan)}</title></rect>`;
     const tot=d.act+d.plan; if(tot>0) g+=`<text class="vl" x="${x+w/2}" y="${y(tot)-7}" text-anchor="middle">${compact(tot)}</text>`;
-    g+=`<text x="${x+w/2}" y="${H-9}" text-anchor="middle" ${d.k===c.curM?'style="fill:var(--ink);font-weight:700"':""}>${monthLabel(d.k)}${d.k===c.curM?" ·hoje":""}</text>`;
+    g+=`<text x="${x+w/2}" y="${H-9}" text-anchor="middle" ${d.k===c.curM?'style="fill:var(--ink);font-weight:700"':""}>${monthLabel(d.k)}${d.k===c.curM?" · hoje":""}</text>`;
   });
   if(pace>0){
     g+=`<line x1="${m.l}" x2="${W-m.r+6}" y1="${y(pace)}" y2="${y(pace)}" stroke="var(--pace)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
@@ -614,7 +623,12 @@ function renderPeople(c){
 
 function renderExpenses(c){
   const ex=c.ds.exp;
-  if(!ex.length){ $("expSum").textContent=""; $("expenses").innerHTML=`<p class="muted" style="margin:0">Nenhuma despesa lançada neste engagement na planilha importada.</p>`; return; }
+  if(!ex.length){
+    $("expSum").textContent="";
+    $("expSide").innerHTML=`<p class="muted" style="margin:0">Nenhuma despesa lançada neste engagement na planilha importada.</p>`;
+    $("expenses").innerHTML=`<p class="muted" style="margin:0">Sem despesas para detalhar.</p>`;
+    return;
+  }
   let fat=0; const mTot={};
   for(const e of ex){ if(e.inv) fat+=e.v; const k=(e.d||"").slice(0,7)||"s/d"; mTot[k]=(mTot[k]||0)+e.v; }
   const months=Object.keys(mTot).filter(k=>k!=="s/d").sort(); if(mTot["s/d"]) months.push("s/d");
@@ -626,11 +640,19 @@ function renderExpenses(c){
   const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]); const maxC=Math.max(1,...cats.map(x=>x[1]));
   const ps=Object.entries(byP).sort((a,b)=>b[1]-a[1]); const maxP=Math.max(1,...ps.map(x=>x[1]));
   const catName = t => { const i=catInfo(t); return `<span class="cn">${esc(i.pt)}</span>${i.pt!==t?`<span class="co">${esc(t)}</span>`:""}`; };
-  const list=(arr,mx,isCat)=>arr.map(([n,v])=>`<div class="cat"><span class="nm" title="${esc(isCat? catInfo(n).desc : n)}">${isCat? catName(n) : esc(n)}</span><span class="tr"><b style="width:${Math.max(0,v/mx*100)}%"></b></span><span class="mono ${v<0?"neg":""}">${BRL2.format(v)}</span></div>`).join("");
+  const list=(arr,mx,isCat)=>arr.map(([n,v])=>`<div class="cat"><span class="nm" title="${esc(isCat? catInfo(n).desc : n)}">${isCat? catName(n) : esc(n)}</span><span class="tr"><b style="width:${Math.max(0,v/mx*100)}%"></b></span><span class="${v<0?"neg":""}">${BRL2.format(v)}</span></div>`).join("");
   const ml = k => k==="s/d"? "sem data" : monthLabel(k);
-  $("expSum").textContent = `${BRL2.format(c.desp)} no total · ${BRL2.format(fat)} já faturado`;
+  const per = sel==="all"?"todos os meses":ml(sel);
+  $("expSum").textContent = `${BRL2.format(fat)} de ${BRL2.format(c.desp)} já faturado`;
 
-  // tabela categoria × mês
+  $("expSide").innerHTML = `
+    <div class="mchips" role="group" aria-label="Filtrar por mês">
+      <button class="mchip" aria-pressed="${sel==="all"}" data-m="all"><span>Todos</span><b>${BRL2.format(c.desp)}</b></button>
+      ${months.map(k=>`<button class="mchip" aria-pressed="${sel===k}" data-m="${esc(k)}"><span>${ml(k)}</span><b>${BRL2.format(mTot[k])}</b></button>`).join("")}
+    </div>
+    <div class="cats"><span class="eyebrow">Por tipo · ${per}</span>${list(cats.slice(0,6),maxC,true)}${cats.length>6?`<span class="muted" style="font-size:.78rem">+ ${cats.length-6} tipos na tabela abaixo</span>`:""}</div>
+    <div class="cats"><span class="eyebrow">Por profissional · ${per}</span>${list(ps,maxP,false)}</div>`;
+
   const allCats=[...new Set(ex.map(e=>e.t))];
   const cm={}; for(const e of ex){ const k=(e.d||"").slice(0,7)||"s/d"; (cm[e.t]||(cm[e.t]={}))[k]=(cm[e.t][k]||0)+e.v; }
   const catTot=t=>Object.values(cm[t]).reduce((a,b)=>a+b,0);
@@ -638,27 +660,13 @@ function renderExpenses(c){
   const f2=v=>v? BRL2.format(v) : "–";
   const sorted=[...fx].sort((a,b)=>(b.d||"").localeCompare(a.d||""));
   $("expenses").innerHTML = `
-    <div class="cats">
-      <h3>Despesas por mês</h3>
-      <div class="mchips" role="group" aria-label="Filtrar por mês">
-        <button class="mchip" aria-pressed="${sel==="all"}" data-m="all"><span>Todos</span><b class="mono">${BRL2.format(c.desp)}</b></button>
-        ${months.map(k=>`<button class="mchip" aria-pressed="${sel===k}" data-m="${esc(k)}"><span>${ml(k)}</span><b class="mono">${BRL2.format(mTot[k])}</b></button>`).join("")}
-      </div>
-    </div>
-    <div class="tbl"><table class="cmx"><thead><tr><th>Tipo de despesa</th>${months.map(k=>`<th class="n ${k===sel?"hl":""}">${ml(k)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
-      ${allCats.map(t=>`<tr><td title="${esc(catInfo(t).desc)}">${catName(t)}</td>${months.map(k=>{const v=cm[t][k]||0; return `<td class="n ${v?"":"zero"} ${k===sel?"hl":""} ${v<0?"neg":""}">${f2(v)}</td>`;}).join("")}<td class="n"><b>${BRL2.format(catTot(t))}</b></td></tr>`).join("")}
-      <tr class="tot"><td>Total do mês</td>${months.map(k=>`<td class="n ${k===sel?"hl":""}">${BRL2.format(mTot[k])}</td>`).join("")}<td class="n">${BRL2.format(c.desp)}</td></tr>
+    <div class="tbl"><table><thead><tr><th>Tipo de despesa</th><th>O que é</th>${months.map(k=>`<th class="n ${k===sel?"hl":""}">${ml(k)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
+      ${allCats.map(t=>`<tr><td>${catName(t)}</td><td class="muted" style="font-size:.8rem;min-width:220px">${esc(catInfo(t).desc)}</td>${months.map(k=>{const v=cm[t][k]||0; return `<td class="n ${v?"":"zero"} ${k===sel?"hl":""} ${v<0?"neg":""}">${f2(v)}</td>`;}).join("")}<td class="n"><b>${BRL2.format(catTot(t))}</b></td></tr>`).join("")}
+      <tr class="tot"><td>Total do mês</td><td></td>${months.map(k=>`<td class="n ${k===sel?"hl":""}">${BRL2.format(mTot[k])}</td>`).join("")}<td class="n">${BRL2.format(c.desp)}</td></tr>
     </tbody></table></div>
-    <div class="split">
-      <div class="cats"><h3>Por categoria · ${sel==="all"?"todos os meses":ml(sel)}</h3>${list(cats,maxC,true)}</div>
-      <div class="cats"><h3>Por profissional · ${sel==="all"?"todos os meses":ml(sel)}</h3>${list(ps,maxP,false)}</div>
-    </div>
-    <details class="glos"><summary>O que é cada tipo de despesa</summary>
-      <dl>${allCats.map(t=>{const i=catInfo(t); return `<div><dt>${esc(i.pt)} <span class="co">${esc(t)}</span></dt><dd>${esc(i.desc)}</dd></div>`;}).join("")}</dl>
-    </details>
     <details><summary>Ver os ${fx.length} lançamentos${sel==="all"?"":" de "+ml(sel)}</summary>
       <div class="tbl"><table><thead><tr><th>Data</th><th>Profissional</th><th>Tipo</th><th class="n">Valor</th><th>Fatura</th></tr></thead><tbody>
-      ${sorted.map(e=>`<tr><td class="mono">${fmtDate(e.d)}</td><td>${esc(e.p)}</td><td>${catName(e.t)}</td><td class="n ${e.v<0?"neg":""}">${BRL2.format(e.v)}</td><td class="mono">${e.inv?esc(e.inv):'<span class="muted">pendente</span>'}</td></tr>`).join("")}
+      ${sorted.map(e=>`<tr><td>${fmtDate(e.d)}</td><td>${esc(e.p)}</td><td>${catName(e.t)}</td><td class="n ${e.v<0?"neg":""}">${BRL2.format(e.v)}</td><td>${e.inv?esc(e.inv):'<span class="muted">pendente</span>'}</td></tr>`).join("")}
       </tbody></table></div>
     </details>`;
 }
@@ -772,7 +780,7 @@ $("rmBox").addEventListener("click",e=>{
   else if(e.target.id==="rmYes"){ removeDataset(state.sel); }
   else if(e.target.id==="rmNo"){ renderParams(); }
 });
-$("expenses").addEventListener("click",e=>{ const b=e.target.closest(".mchip"); if(!b) return; state.expMonth=b.dataset.m; renderExpenses(compute(state.sel)); });
+$("expSide").addEventListener("click",e=>{ const b=e.target.closest(".mchip"); if(!b) return; state.expMonth=b.dataset.m; renderExpenses(compute(state.sel)); });
 for(const [id,v] of [["vRes","res"],["vHrs","hrs"],["vRec","rec"]]) $(id).addEventListener("click",()=>{ state.view=v; renderPeople(compute(state.sel)); });
 /* tela cheia */
 const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
