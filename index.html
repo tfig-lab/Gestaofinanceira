@@ -1,0 +1,891 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Painel Financeiro de Projetos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@87,500..800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* Layout: barra de topo com importação, abas por engagement, coluna de parâmetros à esquerda e leitura financeira à direita */
+/* Paleta: azul KPMG, cobalto, azul claro e roxo sobre vidro fosco */
+:root{
+  --bg:#EAF0FA; --surface:rgba(255,255,255,.58); --glass-border:rgba(255,255,255,.85); --field:rgba(255,255,255,.72);
+  --ink:#0C233C; --muted:#4D5F78; --line:rgba(12,35,60,.11);
+  --accent:#1E49E2; --accent-ink:#FFFFFF; --accent-soft:rgba(30,73,226,.11); --plan:#7FD3F7;
+  --brand:#00338D; --cobalt:#1E49E2; --sky:#00B8F5; --violet:#7213EA; --on-brand:#FFFFFF;
+  --blob1:rgba(30,73,226,.30); --blob2:rgba(0,184,245,.28); --blob3:rgba(114,19,234,.20);
+  --shadow:0 10px 30px -12px rgba(0,51,141,.22), inset 0 1px 0 rgba(255,255,255,.7);
+  --ok:#1F7A4D; --ok-soft:rgba(31,122,77,.12); --warn:#9A5B00; --warn-soft:rgba(214,140,0,.14); --bad:#C0263D; --bad-soft:rgba(192,38,61,.11);
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#06142A; --surface:rgba(255,255,255,.055); --glass-border:rgba(255,255,255,.12); --field:rgba(255,255,255,.06);
+  --ink:#E9EFF9; --muted:#9DADC7; --line:rgba(255,255,255,.10);
+  --accent:#5B86FF; --accent-ink:#FFFFFF; --accent-soft:rgba(91,134,255,.18); --plan:rgba(0,184,245,.55);
+  --blob1:rgba(30,73,226,.45); --blob2:rgba(0,184,245,.22); --blob3:rgba(114,19,234,.35);
+  --shadow:0 12px 34px -14px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.07);
+  --ok:#5FD39A; --ok-soft:rgba(95,211,154,.14); --warn:#F2B860; --warn-soft:rgba(242,184,96,.14); --bad:#FF7E8F; --bad-soft:rgba(255,126,143,.14);
+  color-scheme:dark }}
+:root[data-theme="dark"]{
+  --bg:#06142A; --surface:rgba(255,255,255,.055); --glass-border:rgba(255,255,255,.12); --field:rgba(255,255,255,.06);
+  --ink:#E9EFF9; --muted:#9DADC7; --line:rgba(255,255,255,.10);
+  --accent:#5B86FF; --accent-ink:#FFFFFF; --accent-soft:rgba(91,134,255,.18); --plan:rgba(0,184,245,.55);
+  --blob1:rgba(30,73,226,.45); --blob2:rgba(0,184,245,.22); --blob3:rgba(114,19,234,.35);
+  --shadow:0 12px 34px -14px rgba(0,0,0,.6), inset 0 1px 0 rgba(255,255,255,.07);
+  --ok:#5FD39A; --ok-soft:rgba(95,211,154,.14); --warn:#F2B860; --warn-soft:rgba(242,184,96,.14); --bad:#FF7E8F; --bad-soft:rgba(255,126,143,.14);
+  color-scheme:dark }
+
+/* vidro */
+.bgfx{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;background:var(--bg)}
+.bgfx i{position:absolute;border-radius:50%;filter:blur(70px)}
+.bgfx i:nth-child(1){width:52vw;height:52vw;left:-12vw;top:-18vw;background:var(--blob1)}
+.bgfx i:nth-child(2){width:42vw;height:42vw;right:-10vw;top:18vh;background:var(--blob2)}
+.bgfx i:nth-child(3){width:46vw;height:46vw;left:30vw;bottom:-22vw;background:var(--blob3)}
+.panel,.kpi,.tab,.drop,.btn:not(.primary),.mchip,.seg,.chip.plain{
+  background:var(--surface);border-color:var(--glass-border)!important;
+  -webkit-backdrop-filter:blur(18px) saturate(150%);backdrop-filter:blur(18px) saturate(150%)}
+.panel,.kpi,.tab,.drop{box-shadow:var(--shadow)}
+.btn.primary{background:linear-gradient(135deg,var(--brand),var(--cobalt));border-color:transparent;color:var(--on-brand);box-shadow:0 6px 18px -8px var(--cobalt)}
+.kpi.hero{background:linear-gradient(135deg,var(--brand) 0%,var(--cobalt) 55%,var(--violet) 120%)!important;border-color:rgba(255,255,255,.25)!important;color:var(--on-brand)}
+.bar .fill{background:linear-gradient(90deg,var(--brand),var(--cobalt) 60%,var(--sky))!important}
+.bar .fill.over{background:var(--bad)!important}
+.share .sb b,.cat .tr b{background:linear-gradient(90deg,var(--cobalt),var(--sky))!important}
+.tab[aria-selected="true"]{box-shadow:var(--shadow),inset 0 -3px 0 var(--cobalt)}
+.notice.info{background:var(--surface);border:1px solid var(--glass-border);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 48px}
+.wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+h1,h2,h3{font-family:var(--f-display);font-stretch:87%;margin:0;text-wrap:balance;letter-spacing:-.01em}
+h1{font-size:1.6rem;font-weight:750}
+h2{font-size:1.15rem;font-weight:700}
+h3{font-size:.95rem;font-weight:650}
+.num,td.n,.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.eyebrow{font-size:.7rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* topo */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px}
+.top .id{display:flex;flex-direction:column;gap:2px;min-width:0}
+.importer{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 14px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.small{padding:4px 10px;font-size:.8rem;font-weight:500}
+.btn.danger{color:var(--bad)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:.75rem;padding:3px 9px;border-radius:999px;background:var(--accent-soft);color:var(--ink);white-space:nowrap}
+.chip.ok{background:var(--ok-soft);color:var(--ok)}
+.chip.warn{background:var(--warn-soft);color:var(--warn)}
+.chip.bad{background:var(--bad-soft);color:var(--bad)}
+.chip.plain{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+input[type=file]{display:none}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:28px 20px;text-align:center;background:var(--surface);display:flex;flex-direction:column;align-items:center;gap:10px}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.notice{border-radius:8px;padding:10px 14px;font-size:.85rem}
+.notice.err{background:var(--bad-soft);color:var(--bad)}
+.notice.info{background:var(--accent-soft)}
+
+/* abas */
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px}
+.tab{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;gap:3px;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:var(--r);padding:10px 14px;cursor:pointer;max-width:320px}
+.tab[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+.tab .t1{font-family:var(--f-display);font-stretch:87%;font-weight:700;font-size:.95rem}
+.tab .t2{font-size:.72rem;color:var(--muted)}
+.tab{max-width:380px;gap:6px;padding:12px 16px}
+.tab .t1{display:flex;align-items:center;gap:8px}
+.sdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:var(--muted)}
+.sdot.ok{background:var(--ok)} .sdot.warn{background:var(--warn)} .sdot.bad{background:var(--bad)}
+.tstats{display:grid;grid-template-columns:auto auto auto;gap:4px 18px;margin-top:4px}
+.tstats > span{display:flex;flex-direction:column;gap:1px}
+.tstats b{font-size:.92rem;font-weight:500;color:var(--ink)}
+.tstats b.neg{color:var(--bad)}
+
+/* grade principal */
+.main{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:900px){.main{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.params{position:sticky;top:max(12px,env(safe-area-inset-top,0px))}
+@media (max-width:900px){.params{position:static}}
+.field{display:flex;flex-direction:column;gap:5px}
+.field label{font-weight:600;font-size:.85rem}
+.field .hint{font-size:.75rem;color:var(--muted)}
+.inp{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;background:var(--field);overflow:hidden}
+.inp:focus-within{border-color:var(--accent)}
+.inp span{padding:0 10px;color:var(--muted);font-family:var(--f-mono);font-size:.85rem}
+.inp input{border:0;background:transparent;padding:9px 10px;width:100%;min-width:0;font-family:var(--f-mono);font-size:.95rem;outline:none}
+.check{display:flex;gap:10px;align-items:flex-start;font-size:.85rem;cursor:pointer}
+.check input{margin-top:3px;accent-color:var(--accent)}
+.meta{font-size:.75rem;color:var(--muted);display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line);padding-top:12px}
+.right{display:flex;flex-direction:column;gap:20px;min-width:0}
+
+/* KPIs */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:1100px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.kpis{grid-template-columns:minmax(0,1fr)}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .v{font-family:var(--f-display);font-stretch:87%;font-weight:750;font-size:1.55rem;line-height:1.15;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.kpi .s{font-size:.78rem;color:var(--muted)}
+.kpi.hero{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.kpi.hero .eyebrow,.kpi.hero .s{color:inherit;opacity:.85}
+.kpi.neg .v{color:var(--bad)}
+
+/* barra de consumo */
+.burn{display:flex;flex-direction:column;gap:8px}
+.bar{position:relative;height:14px;border-radius:7px;background:var(--accent-soft);overflow:visible}
+.bar .fill{position:absolute;inset:0 auto 0 0;border-radius:7px;background:var(--accent)}
+.bar .fill.over{background:var(--bad)}
+.bar .mark{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:.78rem;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.status{display:flex;flex-wrap:wrap;gap:10px;align-items:center;font-size:.88rem}
+
+/* gráfico */
+.chart{width:100%;overflow-x:auto}
+.chart svg{display:block}
+.chart text{font-family:var(--f-mono);font-size:10.5px;fill:var(--muted)}
+.chart .vl{fill:var(--ink);font-size:10px}
+
+/* tabelas */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:5px 12px;font-size:.8rem;cursor:pointer;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.hd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:10px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:.85rem}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle}
+th.n,td.n{text-align:right;white-space:nowrap}
+tr.tot td{font-weight:600;border-bottom:0;border-top:2px solid var(--line)}
+td .who{font-weight:600}
+td .lvl{font-size:.72rem;color:var(--muted)}
+.share{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.share .sb{width:70px;height:6px;border-radius:3px;background:var(--accent-soft);position:relative;flex:0 0 auto}
+.share .sb b{position:absolute;inset:0 auto 0 0;border-radius:3px;background:var(--accent)}
+td.neg{color:var(--bad)}
+.zero{color:var(--line)}
+
+.cats{display:flex;flex-direction:column;gap:7px}
+.cat{display:grid;grid-template-columns:minmax(0,190px) minmax(0,1fr) auto;gap:10px;align-items:center;font-size:.83rem}
+.cat .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat .tr{height:8px;border-radius:4px;background:var(--accent-soft);position:relative}
+.cat .tr b{position:absolute;inset:0 auto 0 0;border-radius:4px;background:var(--accent)}
+@media (max-width:520px){.cat{grid-template-columns:minmax(0,1fr) auto}.cat .tr{grid-column:1/-1;grid-row:2}}
+.split{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:24px}
+@media (max-width:760px){.split{grid-template-columns:minmax(0,1fr)}}
+.mchips{display:flex;flex-wrap:wrap;gap:8px}
+.mchip{display:flex;flex-direction:column;align-items:flex-start;gap:1px;border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer;font-size:.75rem;color:var(--muted)}
+.mchip b{font-size:.88rem;color:var(--ink);font-weight:500}
+.mchip:hover{border-color:var(--accent)}
+.mchip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--ink)}
+th.hl,td.hl{background:var(--accent-soft)}
+.cn{display:block}
+.co{display:block;font-size:.7rem;color:var(--muted);font-family:var(--f-mono)}
+dt .co{display:inline;margin-left:6px}
+.cat .nm .co{display:block;margin:0}
+.cat .nm:has(.cn){white-space:normal}
+.glos dl{margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px 24px}
+.glos dt{font-weight:600;font-size:.85rem}
+.glos dd{margin:2px 0 0;font-size:.8rem;color:var(--muted)}
+#expenses{display:flex;flex-direction:column;gap:18px}
+details summary{cursor:pointer;font-weight:600;font-size:.85rem;color:var(--accent)}
+details[open] summary{margin-bottom:10px}
+.confirm{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:.8rem}
+@media (prefers-reduced-motion:no-preference){.bar .fill,.share .sb b,.cat .tr b{transition:width .35s ease}}
+</style>
+
+<style>html,body{margin:0} img{max-width:100%}</style>
+</head>
+<body>
+<div class="bgfx" aria-hidden="true"><i></i><i></i><i></i></div>
+<div class="wrap">
+  <header class="top">
+    <div class="id">
+      <span class="eyebrow">Gestão financeira de engagements</span>
+      <h1>Painel Financeiro de Projetos</h1>
+    </div>
+    <div class="importer">
+      <span id="syncChip" class="chip plain"><span class="dot"></span><span id="syncTxt">Conectando…</span></span>
+      <button class="btn" id="fsBtn" type="button" hidden><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg><span id="fsTxt">Tela cheia</span></button>
+      <label class="btn" for="fileJson" title="Carrega um arquivo .json salvo antes, com dados e parâmetros">Carregar dados</label>
+      <button class="btn" id="expBtn" type="button" title="Baixa um .json com os dados importados e os parâmetros de cada projeto">Salvar dados</button>
+      <label class="btn primary" for="file">Importar planilha</label>
+      <input type="file" id="file" accept=".xls,.xlsx,.xml,.csv,.json">
+      <input type="file" id="fileJson" accept=".json,application/json">
+    </div>
+  </header>
+
+  <div id="msg" hidden></div>
+
+  <section id="empty" class="drop" hidden>
+    <h2>Arraste aqui a planilha de horas e despesas</h2>
+    <p class="muted" style="margin:0;max-width:60ch">O arquivo exportado com as abas <b>TIME</b> e <b>EXPENSE</b> (.xls, .xlsx). O painel separa cada engagement, calcula horas, valor a tabela, receita pela realização e o saldo até a data limite.</p>
+    <div class="importer" style="justify-content:center">
+      <label class="btn primary" for="file">Escolher planilha</label>
+      <label class="btn" for="fileJson">Carregar dados salvos (.json)</label>
+    </div>
+  </section>
+
+  <nav id="tabs" class="tabs" role="tablist" aria-label="Projetos"></nav>
+
+  <div id="main" class="main" hidden>
+    <aside class="panel params" aria-label="Parâmetros do projeto">
+      <div>
+        <span class="eyebrow">Parâmetros</span>
+        <h2 id="pName">—</h2>
+      </div>
+      <div class="field">
+        <label for="inReal">Realização</label>
+        <div class="inp"><input id="inReal" type="number" inputmode="decimal" min="0" max="200" step="0.1" placeholder="ex.: 17"><span>%</span></div>
+        <span class="hint">Receita = charge-out rate × horas × realização</span>
+      </div>
+      <div class="field">
+        <label for="inValor">Valor final do projeto</label>
+        <div class="inp"><span>R$</span><input id="inValor" type="text" inputmode="decimal" placeholder="ex.: 450.000,00"></div>
+        <div class="seg" role="group" aria-label="Base do valor">
+          <button id="bLiq" aria-pressed="true">Líquido</button>
+          <button id="bBruto" aria-pressed="false">Bruto</button>
+        </div>
+      </div>
+      <div class="field" id="impBox" hidden>
+        <label for="inImp">Impostos sobre o bruto</label>
+        <div class="inp"><input id="inImp" type="number" inputmode="decimal" min="0" max="100" step="0.01" placeholder="ex.: 14,25"><span>%</span></div>
+        <span class="hint" id="liqHint"></span>
+      </div>
+      <div class="field">
+        <label for="inPrazo">Data limite de entrega</label>
+        <div class="inp"><input id="inPrazo" type="month"></div>
+        <span class="hint">Considera até o último dia do mês</span>
+      </div>
+      <label class="check"><input id="inDesp" type="checkbox"><span>Descontar despesas do saldo<br><span class="muted" style="font-size:.75rem">Marque se as despesas consomem o fee em vez de serem reembolsadas</span></span></label>
+      <div class="meta" id="pMeta"></div>
+      <div id="rmBox"></div>
+    </aside>
+
+    <div class="right">
+      <div class="kpis" id="kpis"></div>
+
+      <section class="panel" aria-label="Consumo do orçamento">
+        <div class="hd"><h2>Consumo do orçamento</h2><div class="status" id="status"></div></div>
+        <div class="burn" id="burn"></div>
+      </section>
+
+      <section class="panel" aria-label="Receita por mês">
+        <div class="hd">
+          <h2>Receita por mês</h2>
+          <div class="legend"><span><i style="background:var(--accent)"></i>Realizada</span><span><i style="background:var(--plan)"></i>Disponível até a data limite</span></div>
+        </div>
+        <div class="chart" id="chart"></div>
+      </section>
+
+      <section class="panel" aria-label="Profissionais">
+        <div class="hd">
+          <h2>Profissionais</h2>
+          <div class="seg" role="group" aria-label="Visão">
+            <button id="vRes" aria-pressed="true">Resumo</button>
+            <button id="vHrs" aria-pressed="false">Horas por mês</button>
+            <button id="vRec" aria-pressed="false">Receita por mês</button>
+          </div>
+        </div>
+        <div class="tbl" id="people"></div>
+      </section>
+
+      <section class="panel" aria-label="Despesas">
+        <div class="hd"><h2>Despesas</h2><span class="muted" id="expSum"></span></div>
+        <div id="expenses"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+/* ---------- formatação ---------- */
+const BRL = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
+const BRL2 = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2});
+const N1 = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1});
+const N0 = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:0});
+const PCT = v => N1.format(v*100)+"%";
+const money = v => (v==null||!isFinite(v)) ? "—" : BRL.format(v);
+const compact = v => { const a=Math.abs(v); if(a>=1e6) return N1.format(v/1e6)+" mi"; if(a>=1e3) return N0.format(v/1e3)+" mil"; return N0.format(v); };
+const MES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const monthLabel = k => { const [y,m]=k.split("-"); return MES[+m-1]+"/"+y.slice(2); };
+const fmtDate = s => { if(!s) return "—"; const [y,m,d]=s.split("-"); return `${d}/${m}/${y}`; };
+const esc = s => String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const $ = id => document.getElementById(id);
+const pad = n => String(n).padStart(2,"0");
+const isoDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const titleCase = s => String(s||"").toLowerCase().replace(/(^|[\s/])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase());
+
+function parseBR(str){
+  if(str==null) return null;
+  if(typeof str==="number") return str;
+  let s=String(str).trim().replace(/[R$\s]/g,"");
+  if(!s) return null;
+  if(s.includes(",")) s=s.replace(/\./g,"").replace(",",".");
+  else if((s.match(/\./g)||[]).length>1) s=s.replace(/\./g,"");
+  else if(/^\d{1,3}\.\d{3}$/.test(s)) s=s.replace(".","");
+  const n=parseFloat(s); return isFinite(n)?n:null;
+}
+const fmtValorInput = v => v==null ? "" : new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
+
+/* ---------- estado ---------- */
+const DEFAULTS = {}; // parâmetros iniciais por engagement, se quiser fixar algum no código
+const state = { datasets:{}, settings:{}, sel:null, view:"res", expMonth:"all", db:null, shared:false };
+const LS_KEY = "painel-fin-v1";
+function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||"null"); if(j){ state.settings=j.settings||{}; if(!state.shared) state.datasets=j.datasets||{}; state.sel=j.sel||null; } }catch(e){} }
+function lsSave(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({settings:state.settings, datasets: state.shared?{}:state.datasets, sel:state.sel})); }catch(e){} }
+function getSet(eng){
+  const s = state.settings[eng] || {};
+  const d = DEFAULTS[eng] || {};
+  return { real: s.real ?? d.real ?? null, valor: s.valor ?? null, base: s.base || "liq", imposto: s.imposto ?? 14.25, prazo: s.prazo ?? d.prazo ?? "", deduzir: s.deduzir ?? false };
+}
+function liquido(s){ if(s.valor==null) return null; return s.base==="bruto" ? s.valor*(1-(s.imposto||0)/100) : s.valor; }
+
+/* ---------- leitura da planilha ---------- */
+const norm = s => String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+function parseSpreadsheetML(text){
+  const doc = new DOMParser().parseFromString(text,"application/xml");
+  if(doc.getElementsByTagName("parsererror").length) throw new Error("XML inválido");
+  const NS="urn:schemas-microsoft-com:office:spreadsheet";
+  const sheets=[];
+  for(const ws of doc.getElementsByTagNameNS(NS,"Worksheet")){
+    const rows=[];
+    for(const r of ws.getElementsByTagNameNS(NS,"Row")){
+      const vals=[];
+      for(const c of r.getElementsByTagNameNS(NS,"Cell")){
+        const idx=c.getAttributeNS(NS,"Index"); if(idx){ while(vals.length<+idx-1) vals.push(null); }
+        const d=c.getElementsByTagNameNS(NS,"Data")[0];
+        if(!d){ vals.push(null); continue; }
+        const t=d.getAttributeNS(NS,"Type"); const txt=d.textContent.trim();
+        vals.push(t==="Number"? parseFloat(txt) : t==="DateTime"? txt.slice(0,10) : txt);
+      }
+      rows.push(vals);
+    }
+    sheets.push({name:ws.getAttributeNS(NS,"Name")||"", rows});
+  }
+  return sheets;
+}
+function parseWithXLSX(buf){
+  if(!window.XLSX) throw new Error("Leitor de Excel indisponível");
+  const wb=XLSX.read(buf,{type:"array",cellDates:true});
+  return wb.SheetNames.map(n=>({name:n, rows:XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null}).map(r=>r.map(v=>v instanceof Date? isoDate(v): (typeof v==="string"? v.trim(): v)))}));
+}
+function toDate(v){
+  if(v==null||v==="") return null;
+  if(typeof v==="number"){ const d=new Date(Math.round((v-25569)*864e5)); return isoDate(new Date(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())); }
+  const s=String(v);
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`;
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/); if(m) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
+  return null;
+}
+const toNum = v => typeof v==="number"? v : parseBR(v);
+function findHeader(rows, keys){
+  for(let i=0;i<Math.min(rows.length,15);i++){
+    const h=(rows[i]||[]).map(norm);
+    if(keys.every(k=>h.includes(k))) return {i, h};
+  }
+  return null;
+}
+function col(h, ...names){ for(const n of names){ const i=h.indexOf(n); if(i>=0) return i; } return -1; }
+
+function extract(sheets, fileName){
+  const out={}; let nTime=0, nExp=0;
+  const get=(eng,desc,client)=>{
+    if(!out[eng]) out[eng]={eng, desc:"", client:"", fileName, importedAt:new Date().toISOString(), time:[], exp:[]};
+    const o=out[eng];
+    if(desc && desc.length>o.desc.length) o.desc=desc;
+    if(client && !o.client) o.client=client;
+    return o;
+  };
+  const valid = e => e!=null && e!=="" && !/total/i.test(String(e));
+  for(const sh of sheets){
+    const ht=findHeader(sh.rows,["hours"]);
+    const he=findHeader(sh.rows,["expenses"]);
+    if(ht && (ht.h.includes("chargeoutrate")||ht.h.includes("stdprice"))){
+      const h=ht.h, c={eng:col(h,"engno","engagement"),desc:col(h,"engdescription"),cli:col(h,"clientname"),p:col(h,"employeename"),l:col(h,"stafflevel"),d:col(h,"workdate","postingdate"),r:col(h,"chargeoutrate"),v:col(h,"stdprice"),h:col(h,"hours")};
+      for(const row of sh.rows.slice(ht.i+1)){
+        const eng=row[c.eng]; if(!valid(eng)) continue;
+        const hrs=toNum(row[c.h])||0, rate=toNum(row[c.r])||0;
+        let v=c.v>=0? toNum(row[c.v]) : null; if(v==null) v=rate*hrs;
+        get(String(eng).trim(), row[c.desc], row[c.cli]).time.push({d:toDate(row[c.d]), p:String(row[c.p]||"(sem nome)").trim(), l:String(row[c.l]||"").trim(), r:rate, h:hrs, v});
+        nTime++;
+      }
+    } else if(he){
+      const h=he.h, c={eng:col(h,"engagement","engno"),desc:col(h,"engdescription"),cli:col(h,"clientname"),p:col(h,"employeename"),vn:col(h,"vendorname"),d:col(h,"workdate","postingdate"),v:col(h,"expenses"),t:col(h,"expensenarrative","expensetype"),inv:col(h,"invoice"),det:col(h,"additionaldetails")};
+      for(const row of sh.rows.slice(he.i+1)){
+        const eng=row[c.eng]; if(!valid(eng)) continue;
+        const p=(c.p>=0&&row[c.p])||(c.vn>=0&&row[c.vn])||"";
+        get(String(eng).trim(), row[c.desc], row[c.cli]).exp.push({d:toDate(row[c.d]), p:String(p).trim(), t:String(row[c.t]||"Outros").trim(), v:toNum(row[c.v])||0, inv:row[c.inv]?String(row[c.inv]):"", _det:c.det>=0? String(row[c.det]||""):""});
+        nExp++;
+      }
+    }
+  }
+  // Lançamentos contábeis sem profissional: procura o nome no campo "Additional Details"
+  const known=new Set();
+  for(const o of Object.values(out)){ o.time.forEach(r=>known.add(r.p)); o.exp.forEach(e=>e.p&&known.add(e.p)); }
+  const words = s => String(s).normalize("NFD").replace(/[̀-ͯ]/g,"").toUpperCase().replace(/[^A-Z ]/g," ").split(/\s+/).filter(Boolean);
+  const cands=[...known].filter(n=>words(n).length>=2).map(n=>{const w=words(n); return {n, full:w.join(" "), fl:[w[0],w[w.length-1]]};});
+  for(const o of Object.values(out)) for(const e of o.exp){
+    if(!e.p && e._det){
+      const dw=" "+words(e._det).join(" ")+" ";
+      const hit = cands.find(k=>dw.includes(" "+k.full+" ")) || cands.find(k=>dw.includes(" "+k.fl.join(" ")+" ")) || cands.find(k=>dw.includes(" "+k.fl[0]+" ") && dw.includes(" "+k.fl[1]+" ")) || cands.find(k=>{const w=k.full.split(" "); return w.length>2 && dw.includes(" "+w[0]+" "+w[1]+" ");});
+      if(hit) e.p=hit.n;
+    }
+    if(!e.p) e.p="Sem profissional (lançamento contábil)";
+    delete e._det;
+  }
+  return {out, nTime, nExp};
+}
+async function readFile(file){
+  const buf=await file.arrayBuffer();
+  const head=new TextDecoder().decode(buf.slice(0,4096));
+  const sheets = (head.includes("urn:schemas-microsoft-com:office:spreadsheet")) ? parseSpreadsheetML(new TextDecoder().decode(buf)) : parseWithXLSX(buf);
+  return extract(sheets, file.name);
+}
+
+/* ---------- cálculos ---------- */
+function monthsBetween(a,b){ const out=[]; let [y,m]=a.split("-").map(Number); const [y2,m2]=b.split("-").map(Number); while(y<y2||(y===y2&&m<=m2)){ out.push(`${y}-${pad(m)}`); m++; if(m>12){m=1;y++;} if(out.length>60) break; } return out; }
+function compute(eng){
+  const ds=state.datasets[eng]; const s=getSet(eng);
+  const today=new Date(); const todayK=isoDate(today); const curM=todayK.slice(0,7);
+  const real=(s.real??0)/100;
+  let hours=0, tab=0, minD=null, maxD=null; const byMonth={}; const people={};
+  let last28=0; const d28=isoDate(new Date(today.getFullYear(),today.getMonth(),today.getDate()-28));
+  for(const r of ds.time){
+    hours+=r.h; tab+=r.v;
+    if(r.d){ if(!minD||r.d<minD)minD=r.d; if(!maxD||r.d>maxD)maxD=r.d; const k=r.d.slice(0,7); byMonth[k]=(byMonth[k]||0)+r.v; if(r.d>d28) last28+=r.v; }
+    const pk = /^BOT\b/i.test(r.p) ? (r.p.replace(/\s+[A-Z]{1,3}\d{2,}\b/,"").trim() || "BOT") : r.p; // agrupa os BOTs
+    const P=people[pk]||(people[pk]={p:pk,levels:new Set(),rates:new Set(),h:0,v:0,mh:{},mv:{}});
+    if(r.l)P.levels.add(r.l); if(r.r)P.rates.add(r.r); P.h+=r.h; P.v+=r.v;
+    if(r.d){const k=r.d.slice(0,7); P.mh[k]=(P.mh[k]||0)+r.h; P.mv[k]=(P.mv[k]||0)+r.v;}
+  }
+  const desp=ds.exp.reduce((a,e)=>a+e.v,0);
+  const receita=tab*real;
+  const consumo=receita+(s.deduzir?desp:0);
+  const valor=liquido(s);
+  const saldo= valor!=null ? valor-consumo : null;
+  let end=null, monthsLeft=null, frac=0, futureMonths=[];
+  if(s.prazo){
+    const [py,pm]=s.prazo.split("-").map(Number); end=new Date(py,pm,0);
+    if(end>=new Date(today.getFullYear(),today.getMonth(),today.getDate())){
+      const dim=new Date(today.getFullYear(),today.getMonth()+1,0).getDate();
+      frac=(dim-today.getDate()+1)/dim;
+      futureMonths=monthsBetween(curM,s.prazo).slice(1);
+      monthsLeft=frac+futureMonths.length;
+    } else monthsLeft=0;
+  }
+  const saldoMes = (saldo!=null && monthsLeft>0) ? saldo/monthsLeft : null;
+  const blended = hours? tab/hours : 0;
+  const tabMes = saldoMes!=null && real>0 ? saldoMes/real : null;
+  const horasMes = tabMes!=null && blended>0 ? tabMes/blended : null;
+  const ritmo = last28/28*30.44*real; // receita/mês no ritmo das últimas 4 semanas
+  let runOut=null;
+  if(saldo!=null && saldo>0 && ritmo>0){ const days=saldo/(ritmo/30.44); runOut=new Date(today.getTime()+days*864e5); }
+  let elapsed=null;
+  if(minD && end){ const st=new Date(minD+"T00:00:00"); elapsed=Math.max(0,Math.min(1,(today-st)/(end-st))); }
+  return {ds,s,real,hours,tab,receita,desp,consumo,valor,saldo,end,monthsLeft,frac,futureMonths,saldoMes,tabMes,horasMes,blended,ritmo,runOut,elapsed,minD,maxD,byMonth,people:Object.values(people),curM,today};
+}
+
+/* ---------- renderização ---------- */
+function renderAll(){
+  const engs=Object.keys(state.datasets).sort((a,b)=>(state.datasets[a].desc||"").localeCompare(state.datasets[b].desc||""));
+  $("empty").hidden = engs.length>0;
+  $("main").hidden = engs.length===0;
+  if(!engs.length){ $("tabs").innerHTML=""; return; }
+  if(!state.sel || !state.datasets[state.sel]) state.sel=engs[0];
+  $("tabs").innerHTML = engs.map(e=>`<button class="tab" role="tab" aria-selected="${e===state.sel}" data-eng="${esc(e)}">${tabInner(e)}</button>`).join("");
+  renderParams(); renderDetail();
+}
+function tabInner(e){
+  const c=compute(e); const st=statusOf(c);
+  return `<span class="t1"><span class="sdot ${st.cls}" title="${esc(st.short)}"></span>${esc(c.ds.desc||e)}</span>
+    <span class="t2">${esc(titleCase(c.ds.client))} · Eng. ${esc(e)}</span>
+    <span class="tstats">
+      <span><span class="eyebrow">Receita</span><b class="mono">${c.s.real==null?"—":money(c.receita)}</b></span>
+      <span><span class="eyebrow">Saldo</span><b class="mono ${c.saldo!=null&&c.saldo<0?"neg":""}">${money(c.saldo)}</b></span>
+      <span><span class="eyebrow">Realização</span><b class="mono">${c.s.real==null?"—":N1.format(c.s.real)+"%"}</b></span>
+    </span>`;
+}
+function statusOf(c){
+  if(c.s.real==null) return {cls:"plain",short:"Informe a realização",long:"Informe a realização para calcular a receita."};
+  if(c.valor==null) return {cls:"plain",short:"Informe o valor",long:"Informe o valor final do projeto para calcular o saldo."};
+  if(c.saldo<0) return {cls:"bad",short:"Estourado",long:`Orçamento estourado em ${money(-c.saldo)}.`};
+  if(c.monthsLeft===0) return {cls:"warn",short:"Prazo vencido",long:"A data limite já passou."};
+  if(c.runOut && c.end && c.runOut<c.end) return {cls:"warn",short:"Ritmo acima do plano",long:`No ritmo das últimas 4 semanas (${money(c.ritmo)}/mês), o saldo acaba em ${fmtDate(isoDate(c.runOut))}, antes da data limite.`};
+  return {cls:"ok",short:"Dentro do orçamento",long: c.ritmo>0? `No ritmo das últimas 4 semanas (${money(c.ritmo)}/mês) o saldo cobre até a data limite.` : "Sem lançamentos nas últimas 4 semanas."};
+}
+function renderParams(){
+  const e=state.sel, s=getSet(e), ds=state.datasets[e];
+  $("pName").textContent = ds.desc || e;
+  const ae=document.activeElement;
+  if(ae!==$("inReal")) $("inReal").value = s.real ?? "";
+  if(ae!==$("inValor")) $("inValor").value = fmtValorInput(s.valor);
+  if(ae!==$("inPrazo")) $("inPrazo").value = s.prazo || "";
+  if(ae!==$("inImp")) $("inImp").value = s.imposto ?? "";
+  renderBase(s);
+  $("inDesp").checked = !!s.deduzir;
+  const imp = ds.importedAt? new Date(ds.importedAt) : null;
+  $("pMeta").innerHTML = `<span>Cliente: ${esc(titleCase(ds.client))}</span><span>Engagement ${esc(e)}</span><span>Arquivo: ${esc(ds.fileName||"—")}</span><span>Importado em ${imp? imp.toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}):"—"}</span>`;
+  $("rmBox").innerHTML = `<button class="btn small danger" id="rmBtn">Remover projeto do painel</button>`;
+}
+function renderBase(s){
+  $("bLiq").setAttribute("aria-pressed", String(s.base!=="bruto"));
+  $("bBruto").setAttribute("aria-pressed", String(s.base==="bruto"));
+  $("impBox").hidden = s.base!=="bruto";
+  const l=liquido(s);
+  $("liqHint").textContent = l==null ? "Informe o valor bruto acima" : `Valor líquido para o controle: ${BRL2.format(l)}`;
+}
+function kpi(label,value,sub,cls=""){ return `<div class="kpi ${cls}"><span class="eyebrow">${label}</span><span class="v">${value}</span><span class="s">${sub}</span></div>`; }
+function renderDetail(){
+  const c=compute(state.sel);
+  const st=statusOf(c);
+  // KPIs
+  const mesesTxt = c.monthsLeft==null? "Defina a data limite" : c.monthsLeft===0? "Prazo encerrado" : `${N1.format(c.monthsLeft)} meses até ${fmtDate(isoDate(c.end))}`;
+  $("kpis").innerHTML =
+    kpi("Receita reconhecida", c.s.real==null? "—" : money(c.receita), `${N1.format(c.hours)} h · ${money(c.tab)} a tabela × ${c.s.real==null?"—":N1.format(c.s.real)+"%"}`) +
+    kpi("Saldo líquido", money(c.saldo), c.valor==null? "Informe o valor do projeto" : `de ${money(c.valor)} líquido${c.s.base==="bruto"? ` (${money(c.s.valor)} bruto − ${new Intl.NumberFormat("pt-BR",{maximumFractionDigits:2}).format(c.s.imposto||0)}%)`:""}${c.s.deduzir? " · despesas descontadas":""}`, c.saldo!=null&&c.saldo<0?"neg":"") +
+    kpi("Disponível por mês", c.saldoMes==null? "—" : money(c.saldoMes), c.horasMes!=null && c.saldoMes>0 ? `${mesesTxt}<br>≈ ${money(c.tabMes)} a tabela · ~${N0.format(c.horasMes)} h/mês` : mesesTxt, "hero") +
+    kpi("Despesas", money(c.desp), `${c.ds.exp.length} lançamentos${c.s.deduzir?" · descontadas do saldo":" · fora do saldo"}`);
+  // consumo
+  $("status").innerHTML = `<span class="chip ${st.cls}"><span class="dot"></span>${st.short}</span><span class="muted">${esc(st.long)}</span>`;
+  if(c.valor!=null && c.valor>0){
+    const used=c.consumo/c.valor;
+    $("burn").innerHTML = `
+      <div class="bar" role="img" aria-label="${PCT(used)} do orçamento consumido">
+        <div class="fill ${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></div>
+        ${c.elapsed!=null? `<div class="mark" style="left:calc(${c.elapsed*100}% - 1px)" title="Tempo decorrido"></div>`:""}
+      </div>
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>${PCT(used)} consumido (${money(c.consumo)})</span>
+        ${c.elapsed!=null? `<span><i style="background:var(--ink);width:2px"></i>${PCT(c.elapsed)} do prazo decorrido (desde ${fmtDate(c.minD)})</span>`:""}
+        <span>Valor/hora médio a tabela: ${money(c.blended)}</span>
+      </div>`;
+  } else {
+    $("burn").innerHTML = `<div class="notice info">Informe o <b>valor final do projeto</b> à esquerda para ver o saldo, o consumo e o valor disponível por mês.</div>`;
+  }
+  renderChart(c); renderPeople(c); renderExpenses(c);
+}
+
+function renderChart(c){
+  const startM = c.minD? c.minD.slice(0,7) : c.curM;
+  const lastM = c.s.prazo && c.s.prazo>c.curM ? c.s.prazo : (c.maxD? c.maxD.slice(0,7) : c.curM);
+  const months = monthsBetween(startM, lastM>c.curM? lastM : c.curM);
+  const allow = c.saldoMes!=null && c.saldoMes>0 ? c.saldoMes : 0;
+  const data = months.map(k=>{
+    const act=(c.byMonth[k]||0)*c.real;
+    let plan=0;
+    if(allow && c.s.prazo && k>=c.curM && k<=c.s.prazo) plan = k===c.curM ? allow*c.frac : allow;
+    return {k,act,plan};
+  });
+  const box=$("chart"); const W=Math.max(box.clientWidth||600, months.length*46); const H=240;
+  const m={t:22,r:8,b:26,l:52};
+  const max=Math.max(1,...data.map(d=>d.act+d.plan));
+  const nice = (()=>{ const p=Math.pow(10,Math.floor(Math.log10(max))); const f=max/p; return (f<=1?1:f<=2?2:f<=5?5:10)*p; })();
+  const y=v=>m.t+(H-m.t-m.b)*(1-v/nice);
+  const bw=(W-m.l-m.r)/data.length; const w=Math.min(46,bw*0.62);
+  let g="";
+  for(let i=0;i<=4;i++){ const v=nice*i/4; g+=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${m.l-8}" y="${y(v)+3.5}" text-anchor="end">${compact(v)}</text>`; }
+  data.forEach((d,i)=>{
+    const x=m.l+bw*i+(bw-w)/2;
+    if(d.act>0) g+=`<rect x="${x}" y="${y(d.act)}" width="${w}" height="${y(0)-y(d.act)}" fill="var(--accent)" rx="2"><title>${monthLabel(d.k)} · realizada ${money(d.act)}</title></rect>`;
+    if(d.plan>0) g+=`<rect x="${x}" y="${y(d.act+d.plan)}" width="${w}" height="${y(d.act)-y(d.act+d.plan)}" fill="var(--plan)" rx="2"><title>${monthLabel(d.k)} · disponível ${money(d.plan)}</title></rect>`;
+    const tot=d.act+d.plan; if(tot>0) g+=`<text class="vl" x="${x+w/2}" y="${y(tot)-6}" text-anchor="middle">${compact(tot)}</text>`;
+    g+=`<text x="${x+w/2}" y="${H-8}" text-anchor="middle" ${d.k===c.curM?'style="fill:var(--ink);font-weight:600"':""}>${monthLabel(d.k)}</text>`;
+  });
+  box.innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Receita realizada por mês e valor disponível até a data limite">${g}</svg>`;
+}
+
+function renderPeople(c){
+  const rows=c.people.sort((a,b)=>b.v-a.v);
+  const totH=c.hours, totV=c.tab;
+  for(const b of ["vRes","vHrs","vRec"]) $(b).setAttribute("aria-pressed", String(({vRes:"res",vHrs:"hrs",vRec:"rec"})[b]===state.view));
+  const who=p=>`<div class="who">${esc(p.p)}</div><div class="lvl">${[...p.levels].map(titleCase).map(esc).join(" → ")||""}</div>`;
+  if(state.view==="res"){
+    $("people").innerHTML=`<table><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">Horas</th><th class="n">Valor a tabela</th><th class="n">Receita</th><th class="n">% da receita</th></tr></thead><tbody>
+    ${rows.map(p=>{ const sh=totV? p.v/totV:0; return `<tr><td>${who(p)}</td><td class="n">${[...p.rates].sort((a,b)=>a-b).map(r=>N0.format(r)).join(" / ")}</td><td class="n">${N1.format(p.h)}</td><td class="n">${money(p.v)}</td><td class="n">${money(p.v*c.real)}</td><td class="n"><div class="share"><span class="mono">${PCT(sh)}</span><span class="sb"><b style="width:${Math.max(0,sh*100)}%"></b></span></div></td></tr>`; }).join("")}
+    <tr class="tot"><td>Total</td><td class="n">${money(c.blended)}/h médio</td><td class="n">${N1.format(totH)}</td><td class="n">${money(totV)}</td><td class="n">${money(c.receita)}</td><td class="n">100%</td></tr></tbody></table>`;
+  } else {
+    const months=c.minD? monthsBetween(c.minD.slice(0,7), c.maxD.slice(0,7)) : [];
+    const key = state.view==="hrs"? "mh":"mv";
+    const f = state.view==="hrs"? (v=>N1.format(v)) : (v=>money(v*c.real));
+    const colTot=months.map(k=>rows.reduce((a,p)=>a+(p[key][k]||0),0));
+    $("people").innerHTML=`<table><thead><tr><th>Profissional</th>${months.map(k=>`<th class="n">${monthLabel(k)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
+    ${rows.map(p=>`<tr><td>${who(p)}</td>${months.map(k=>{const v=p[key][k]||0; return `<td class="n ${v?"":"zero"}">${v?f(v):"–"}</td>`;}).join("")}<td class="n"><b>${f(state.view==="hrs"?p.h:p.v)}</b></td></tr>`).join("")}
+    <tr class="tot"><td>Total</td>${colTot.map(v=>`<td class="n">${f(v)}</td>`).join("")}<td class="n">${f(state.view==="hrs"?totH:totV)}</td></tr></tbody></table>`;
+  }
+}
+
+function renderExpenses(c){
+  const ex=c.ds.exp;
+  if(!ex.length){ $("expSum").textContent=""; $("expenses").innerHTML=`<p class="muted" style="margin:0">Nenhuma despesa lançada neste engagement na planilha importada.</p>`; return; }
+  let fat=0; const mTot={};
+  for(const e of ex){ if(e.inv) fat+=e.v; const k=(e.d||"").slice(0,7)||"s/d"; mTot[k]=(mTot[k]||0)+e.v; }
+  const months=Object.keys(mTot).filter(k=>k!=="s/d").sort(); if(mTot["s/d"]) months.push("s/d");
+  if(state.expMonth!=="all" && !months.includes(state.expMonth)) state.expMonth="all";
+  const sel=state.expMonth;
+  const fx = sel==="all"? ex : ex.filter(e=>((e.d||"").slice(0,7)||"s/d")===sel);
+  const byCat={}, byP={};
+  for(const e of fx){ byCat[e.t]=(byCat[e.t]||0)+e.v; byP[e.p]=(byP[e.p]||0)+e.v; }
+  const cats=Object.entries(byCat).sort((a,b)=>b[1]-a[1]); const maxC=Math.max(1,...cats.map(x=>x[1]));
+  const ps=Object.entries(byP).sort((a,b)=>b[1]-a[1]); const maxP=Math.max(1,...ps.map(x=>x[1]));
+  const catName = t => { const i=catInfo(t); return `<span class="cn">${esc(i.pt)}</span>${i.pt!==t?`<span class="co">${esc(t)}</span>`:""}`; };
+  const list=(arr,mx,isCat)=>arr.map(([n,v])=>`<div class="cat"><span class="nm" title="${esc(isCat? catInfo(n).desc : n)}">${isCat? catName(n) : esc(n)}</span><span class="tr"><b style="width:${Math.max(0,v/mx*100)}%"></b></span><span class="mono ${v<0?"neg":""}">${BRL2.format(v)}</span></div>`).join("");
+  const ml = k => k==="s/d"? "sem data" : monthLabel(k);
+  $("expSum").textContent = `${BRL2.format(c.desp)} no total · ${BRL2.format(fat)} já faturado`;
+
+  // tabela categoria × mês
+  const allCats=[...new Set(ex.map(e=>e.t))];
+  const cm={}; for(const e of ex){ const k=(e.d||"").slice(0,7)||"s/d"; (cm[e.t]||(cm[e.t]={}))[k]=(cm[e.t][k]||0)+e.v; }
+  const catTot=t=>Object.values(cm[t]).reduce((a,b)=>a+b,0);
+  allCats.sort((a,b)=>catTot(b)-catTot(a));
+  const f2=v=>v? BRL2.format(v) : "–";
+  const sorted=[...fx].sort((a,b)=>(b.d||"").localeCompare(a.d||""));
+  $("expenses").innerHTML = `
+    <div class="cats">
+      <h3>Despesas por mês</h3>
+      <div class="mchips" role="group" aria-label="Filtrar por mês">
+        <button class="mchip" aria-pressed="${sel==="all"}" data-m="all"><span>Todos</span><b class="mono">${BRL2.format(c.desp)}</b></button>
+        ${months.map(k=>`<button class="mchip" aria-pressed="${sel===k}" data-m="${esc(k)}"><span>${ml(k)}</span><b class="mono">${BRL2.format(mTot[k])}</b></button>`).join("")}
+      </div>
+    </div>
+    <div class="tbl"><table class="cmx"><thead><tr><th>Tipo de despesa</th>${months.map(k=>`<th class="n ${k===sel?"hl":""}">${ml(k)}</th>`).join("")}<th class="n">Total</th></tr></thead><tbody>
+      ${allCats.map(t=>`<tr><td title="${esc(catInfo(t).desc)}">${catName(t)}</td>${months.map(k=>{const v=cm[t][k]||0; return `<td class="n ${v?"":"zero"} ${k===sel?"hl":""} ${v<0?"neg":""}">${f2(v)}</td>`;}).join("")}<td class="n"><b>${BRL2.format(catTot(t))}</b></td></tr>`).join("")}
+      <tr class="tot"><td>Total do mês</td>${months.map(k=>`<td class="n ${k===sel?"hl":""}">${BRL2.format(mTot[k])}</td>`).join("")}<td class="n">${BRL2.format(c.desp)}</td></tr>
+    </tbody></table></div>
+    <div class="split">
+      <div class="cats"><h3>Por categoria · ${sel==="all"?"todos os meses":ml(sel)}</h3>${list(cats,maxC,true)}</div>
+      <div class="cats"><h3>Por profissional · ${sel==="all"?"todos os meses":ml(sel)}</h3>${list(ps,maxP,false)}</div>
+    </div>
+    <details class="glos"><summary>O que é cada tipo de despesa</summary>
+      <dl>${allCats.map(t=>{const i=catInfo(t); return `<div><dt>${esc(i.pt)} <span class="co">${esc(t)}</span></dt><dd>${esc(i.desc)}</dd></div>`;}).join("")}</dl>
+    </details>
+    <details><summary>Ver os ${fx.length} lançamentos${sel==="all"?"":" de "+ml(sel)}</summary>
+      <div class="tbl"><table><thead><tr><th>Data</th><th>Profissional</th><th>Tipo</th><th class="n">Valor</th><th>Fatura</th></tr></thead><tbody>
+      ${sorted.map(e=>`<tr><td class="mono">${fmtDate(e.d)}</td><td>${esc(e.p)}</td><td>${catName(e.t)}</td><td class="n ${e.v<0?"neg":""}">${BRL2.format(e.v)}</td><td class="mono">${e.inv?esc(e.inv):'<span class="muted">pendente</span>'}</td></tr>`).join("")}
+      </tbody></table></div>
+    </details>`;
+}
+const CATS = [
+  [/lodging|hotel|hosped/i, "Hospedagem", "Diárias de hotel da equipe em viagem ao cliente."],
+  [/rec\s*-\s*others?\s*tax/i, "Taxas sobre hospedagem e locação", "Impostos e taxas cobrados junto com hotel ou aluguel de carro (ISS, taxa de turismo etc.), lançados à parte."],
+  [/\bkm\b|mileage|quilomet/i, "Quilometragem (carro próprio)", "Reembolso por km rodado com carro próprio. Não vale para sócios."],
+  [/air|a[eé]re/i, "Passagens aéreas", "Bilhetes de avião."],
+  [/per diem/i, "Diária de alimentação", "Valor fixo por dia de viagem para alimentação."],
+  [/meal|refei/i, "Refeições", "Almoços e jantares com comprovante, durante viagem ou trabalho no cliente."],
+  [/taxi|uber|t[aá]xi/i, "Táxi e aplicativos", "Deslocamentos de táxi ou app (Uber, 99)."],
+  [/fuel|combust/i, "Combustível", "Abastecimento de carro alugado ou usado na viagem."],
+  [/car rental|loca[cç][aã]o/i, "Aluguel de carro", "Locação de veículo (ex.: Localiza). Valores negativos são estornos."],
+  [/toll|parking|ped[aá]gio|estacion/i, "Pedágio e estacionamento", "Pedágios na estrada e estacionamentos."],
+  [/third party|pcs/i, "Serviços de terceiros", "Taxas de fornecedores externos, como a agência de viagens que emite reservas."],
+  [/interest on wip|wip/i, "Juros sobre WIP", "Custo financeiro interno sobre horas e despesas ainda não faturadas (work in progress). Pode vir negativo quando há ajuste."]
+];
+function catInfo(t){ for(const [re,pt,desc] of CATS) if(re.test(t)) return {pt,desc}; return {pt:t, desc:"Categoria conforme a planilha."}; }
+
+/* ---------- persistência ---------- */
+function setSync(kind,txt){ const ch=$("syncChip"); ch.className="chip "+kind; $("syncTxt").textContent=txt; }
+function showMsg(kind,html){ const m=$("msg"); m.className="notice "+kind; m.innerHTML=html; m.hidden=false; clearTimeout(showMsg.t); if(kind!=="err") showMsg.t=setTimeout(()=>{m.hidden=true;},7000); }
+const pendingSave={};
+function saveSettings(eng){
+  lsSave();
+  if(!state.db) return;
+  clearTimeout(pendingSave[eng]);
+  pendingSave[eng]=setTimeout(async()=>{
+    try{ await state.db.doc("settings/"+eng).set({...state.settings[eng], updatedAt:new Date().toISOString()}); setSync("ok","Salvo para a equipe"); }
+    catch(e){ setSync("warn","Parâmetros só neste navegador"); }
+  },500);
+}
+const PART=1200;
+async function saveDataset(ds){
+  if(!state.db) return;
+  const n=Math.max(1,Math.ceil(Math.max(ds.time.length,ds.exp.length)/PART));
+  const prev=await state.db.doc("datasets/"+ds.eng).get().catch(()=>null);
+  const prevN = prev&&prev.exists ? (prev.data().parts||0) : 0;
+  for(let i=0;i<n;i++){
+    await state.db.doc(`datasets/${ds.eng}/parts/p${i}`).set({time:ds.time.slice(i*PART,(i+1)*PART), exp:ds.exp.slice(i*PART,(i+1)*PART)});
+  }
+  for(let i=n;i<prevN;i++) await state.db.doc(`datasets/${ds.eng}/parts/p${i}`).delete().catch(()=>{});
+  await state.db.doc("datasets/"+ds.eng).set({eng:ds.eng, desc:ds.desc, client:ds.client, fileName:ds.fileName, importedAt:ds.importedAt, parts:n, nTime:ds.time.length, nExp:ds.exp.length});
+}
+async function removeDataset(eng){
+  const ds=state.datasets[eng]; delete state.datasets[eng]; if(state.sel===eng) state.sel=null; lsSave(); renderAll();
+  if(state.db && ds){ try{ const n=ds.parts||1; for(let i=0;i<n;i++) await state.db.doc(`datasets/${eng}/parts/p${i}`).delete(); await state.db.doc("datasets/"+eng).delete(); }catch(e){ showMsg("err","Não foi possível remover o projeto do armazenamento compartilhado."); } }
+}
+const loaded={};
+async function loadDatasetDoc(snap){
+  const meta=snap.data(); if(!meta) return;
+  if(loaded[snap.id]===meta.importedAt) return;
+  const time=[],exp=[];
+  for(let i=0;i<(meta.parts||1);i++){
+    const p=await state.db.doc(`datasets/${snap.id}/parts/p${i}`).get();
+    if(p.exists){ const d=p.data(); time.push(...(d.time||[])); exp.push(...(d.exp||[])); }
+  }
+  loaded[snap.id]=meta.importedAt;
+  state.datasets[snap.id]={...meta, eng:snap.id, time, exp};
+}
+async function initDb(){
+  let db=null;
+  try{ db = window.claude && window.claude.use ? await window.claude.use("db") : null; }catch(e){ db=null; }
+  if(!db){ setSync("plain","Salvo só neste navegador"); renderAll(); return; }
+  state.db=db; state.shared=true;
+  db.collection("settings").onSnapshot(snap=>{
+    for(const d of snap.docs){ const v=d.data(); state.settings[d.id]={real:v.real??null, valor:v.valor??null, base:v.base==="bruto"?"bruto":"liq", imposto:v.imposto??14.25, prazo:v.prazo??"", deduzir:!!v.deduzir}; }
+    setSync("ok","Salvo para a equipe"); renderAll();
+  },()=>setSync("warn","Sem conexão com o armazenamento"));
+  let first=true;
+  db.collection("datasets").onSnapshot(async snap=>{
+    const ids=new Set(snap.docs.map(d=>d.id));
+    for(const id of Object.keys(state.datasets)) if(!ids.has(id) && loaded[id]) { delete state.datasets[id]; delete loaded[id]; }
+    try{ for(const d of snap.docs) await loadDatasetDoc(d); }catch(e){ setSync("warn","Erro ao carregar dados salvos"); }
+    if(first && !snap.docs.length){ /* nada salvo ainda: mantém o que estiver local */ }
+    first=false; renderAll();
+  },()=>setSync("warn","Sem conexão com o armazenamento"));
+}
+
+/* ---------- arquivo de dados (.json) ---------- */
+const APP_ID="painel-financeiro-projetos";
+function buildExport(){
+  return {app:APP_ID, version:1, exportedAt:new Date().toISOString(), settings:state.settings,
+    datasets:Object.fromEntries(Object.entries(state.datasets).map(([k,d])=>[k,{eng:d.eng||k,desc:d.desc,client:d.client,fileName:d.fileName,importedAt:d.importedAt,time:d.time,exp:d.exp}]))};
+}
+async function exportData(){
+  if(!Object.keys(state.datasets).length){ showMsg("err","Ainda não há dados para salvar. Importe uma planilha primeiro."); return; }
+  const txt=JSON.stringify(buildExport());
+  const fname=`painel-projetos-${isoDate(new Date())}.json`;
+  let dl=null; try{ dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; }catch(e){ dl=null; }
+  if(dl){
+    try{ await dl.save({filename:fname, data:txt}); showMsg("info",`Arquivo <b>${esc(fname)}</b> salvo.`); }
+    catch(e){ if(e&&e.code!=="declined") showMsg("err","Não foi possível salvar o arquivo nesta visualização."); }
+    return;
+  }
+  try{
+    const url=URL.createObjectURL(new Blob([txt],{type:"application/json"}));
+    const a=document.createElement("a"); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+    showMsg("info",`Arquivo <b>${esc(fname)}</b> baixado. Use “Carregar dados” para abri-lo depois.`);
+  }catch(e){ showMsg("err","O navegador bloqueou o download do arquivo."); }
+}
+function validJson(obj){ return obj && typeof obj==="object" && obj.datasets && typeof obj.datasets==="object"; }
+function cleanSettings(v){ return {real:toNum(v.real)??null, valor:toNum(v.valor)??null, base:v.base==="bruto"?"bruto":"liq", imposto:toNum(v.imposto)??14.25, prazo:/^\d{4}-\d{2}$/.test(v.prazo||"")?v.prazo:"", deduzir:!!v.deduzir, updatedAt:v.updatedAt||null}; }
+function cleanDataset(k,d){
+  return {eng:String(k), desc:String(d.desc||""), client:String(d.client||""), fileName:String(d.fileName||""), importedAt:d.importedAt||new Date().toISOString(),
+    time:(Array.isArray(d.time)?d.time:[]).map(r=>({d:toDate(r.d), p:String(r.p||""), l:String(r.l||""), r:toNum(r.r)||0, h:toNum(r.h)||0, v:toNum(r.v)||0})),
+    exp:(Array.isArray(d.exp)?d.exp:[]).map(e=>({d:toDate(e.d), p:String(e.p||""), t:String(e.t||"Outros"), v:toNum(e.v)||0, inv:String(e.inv||"")}))};
+}
+// mode "replace": o arquivo manda; mode "base": o que já está salvo neste navegador e for mais novo prevalece
+function applyJson(obj, mode){
+  const engs=[];
+  for(const [k,d] of Object.entries(obj.datasets)){
+    const nd=cleanDataset(k,d); nd.parts=Math.max(1,Math.ceil(Math.max(nd.time.length,nd.exp.length)/PART));
+    const cur=state.datasets[k];
+    if(mode==="base" && cur && (cur.importedAt||"")>=(nd.importedAt||"")) continue;
+    state.datasets[k]=nd; loaded[k]=nd.importedAt; engs.push(k);
+  }
+  const sets=[];
+  for(const [k,v] of Object.entries(obj.settings||{})){
+    const cur=state.settings[k];
+    if(mode==="base" && cur && (cur.updatedAt||"")>=(v.updatedAt||"")) continue;
+    state.settings[k]=cleanSettings(v); sets.push(k);
+  }
+  return {engs, sets};
+}
+async function handleJson(file){
+  let obj; try{ obj=JSON.parse(await file.text()); }catch(e){ showMsg("err",`<b>${esc(file.name)}</b> não é um arquivo de dados válido.`); return; }
+  if(!validJson(obj)){ showMsg("err",`<b>${esc(file.name)}</b> não tem o formato salvo por este painel.`); return; }
+  const {engs,sets}=applyJson(obj,"replace");
+  if(engs[0]) state.sel=engs[0];
+  lsSave(); renderAll();
+  showMsg("info",`Carregado <b>${esc(file.name)}</b>: ${engs.length} projeto(s) e ${sets.length} conjunto(s) de parâmetros.`);
+  if(state.db){
+    setSync("plain","Salvando…");
+    try{ for(const e of engs) await saveDataset(state.datasets[e]); for(const e of sets) await state.db.doc("settings/"+e).set({...state.settings[e], updatedAt:state.settings[e].updatedAt||new Date().toISOString()}); setSync("ok","Salvo para a equipe"); }
+    catch(e){ setSync("warn","Dados só neste navegador"); }
+  }
+}
+// Fora do Claude (ex.: GitHub Pages): se existir um dados.json ao lado da página, ele é carregado ao abrir
+async function autoLoadDataFile(){
+  if(window.claude || location.protocol==="file:") return false;
+  try{
+    const r=await fetch("dados.json",{cache:"no-store"}); if(!r.ok) return false;
+    const obj=await r.json(); if(!validJson(obj)) return false;
+    const {engs}=applyJson(obj,"base"); lsSave();
+    if(engs.length) setSync("plain","Dados de dados.json");
+    return true;
+  }catch(e){ return false; }
+}
+
+/* ---------- eventos ---------- */
+async function handleFile(file){
+  if(!file) return;
+  if(/\.json$/i.test(file.name)) return handleJson(file);
+  try{
+    const {out,nTime,nExp}=await readFile(file);
+    const engs=Object.keys(out);
+    if(!engs.length){ showMsg("err","Não encontrei as abas de horas (colunas <b>Hours</b> e <b>Charge-Out Rate</b>) nem de despesas (<b>Expenses</b>) neste arquivo. Confira se é a exportação de TIME/EXPENSE."); return; }
+    for(const e of engs){ out[e].parts=Math.max(1,Math.ceil(Math.max(out[e].time.length,out[e].exp.length)/PART)); state.datasets[e]=out[e]; loaded[e]=out[e].importedAt; }
+    if(!engs.includes(state.sel)) state.sel=engs[0];
+    lsSave(); renderAll();
+    showMsg("info",`Importado <b>${esc(file.name)}</b>: ${nTime} lançamentos de horas e ${nExp} de despesas em ${engs.length} projeto(s).`);
+    if(state.db){ setSync("plain","Salvando…"); try{ for(const e of engs) await saveDataset(out[e]); setSync("ok","Salvo para a equipe"); }catch(err){ setSync("warn","Dados só neste navegador"); showMsg("err","A planilha foi lida, mas não consegui salvá-la para a equipe. Ela continua visível nesta aba."); } }
+  }catch(err){ showMsg("err",`Não consegui ler <b>${esc(file.name)}</b>. Exporte novamente como Excel (.xls ou .xlsx) e tente outra vez.`); }
+}
+$("file").addEventListener("change",e=>{ handleFile(e.target.files[0]); e.target.value=""; });
+$("fileJson").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) handleJson(f); e.target.value=""; });
+$("expBtn").addEventListener("click",exportData);
+["dragenter","dragover"].forEach(t=>document.addEventListener(t,e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes("Files")){ e.preventDefault(); $("empty").classList.add("over"); } }));
+["dragleave","drop"].forEach(t=>document.addEventListener(t,e=>{ $("empty").classList.remove("over"); }));
+document.addEventListener("drop",e=>{ if(e.dataTransfer&&e.dataTransfer.files.length){ e.preventDefault(); handleFile(e.dataTransfer.files[0]); } });
+
+$("tabs").addEventListener("click",e=>{ const b=e.target.closest(".tab"); if(!b) return; state.sel=b.dataset.eng; lsSave(); renderAll(); });
+function upd(patch){ const e=state.sel; state.settings[e]={...getSet(e),...patch, updatedAt:new Date().toISOString()}; renderTabsOnly(); renderDetail(); saveSettings(e); }
+function renderTabsOnly(){ for(const b of $("tabs").querySelectorAll(".tab")) b.innerHTML=tabInner(b.dataset.eng); }
+$("inReal").addEventListener("input",e=>{ const v=parseBR(e.target.value); upd({real: v}); });
+$("inValor").addEventListener("input",e=>{ upd({valor: parseBR(e.target.value)}); });
+$("inValor").addEventListener("blur",e=>{ e.target.value=fmtValorInput(getSet(state.sel).valor); });
+$("inPrazo").addEventListener("change",e=>{ upd({prazo: e.target.value}); });
+$("inImp").addEventListener("input",e=>{ upd({imposto: parseBR(e.target.value)}); renderBase(getSet(state.sel)); });
+$("bLiq").addEventListener("click",()=>{ upd({base:"liq"}); renderBase(getSet(state.sel)); });
+$("bBruto").addEventListener("click",()=>{ upd({base:"bruto"}); renderBase(getSet(state.sel)); });
+$("inDesp").addEventListener("change",e=>{ upd({deduzir: e.target.checked}); });
+$("rmBox").addEventListener("click",e=>{
+  if(e.target.id==="rmBtn"){ $("rmBox").innerHTML=`<div class="confirm"><span>Remover este projeto para todos?</span><button class="btn small danger" id="rmYes">Remover</button><button class="btn small" id="rmNo">Cancelar</button></div>`; }
+  else if(e.target.id==="rmYes"){ removeDataset(state.sel); }
+  else if(e.target.id==="rmNo"){ renderParams(); }
+});
+$("expenses").addEventListener("click",e=>{ const b=e.target.closest(".mchip"); if(!b) return; state.expMonth=b.dataset.m; renderExpenses(compute(state.sel)); });
+for(const [id,v] of [["vRes","res"],["vHrs","hrs"],["vRec","rec"]]) $(id).addEventListener("click",()=>{ state.view=v; renderPeople(compute(state.sel)); });
+/* tela cheia */
+const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
+if(document.fullscreenEnabled||document.webkitFullscreenEnabled){
+  $("fsBtn").hidden=false;
+  $("fsBtn").addEventListener("click",async()=>{
+    try{
+      if(fsEl()){ await (document.exitFullscreen||document.webkitExitFullscreen).call(document); }
+      else { const r=document.documentElement; await (r.requestFullscreen||r.webkitRequestFullscreen).call(r); }
+    }catch(e){ showMsg("err","O modo tela cheia não está disponível nesta visualização. Abra o painel numa aba própria do navegador e tente de novo."); }
+  });
+  const fsSync=()=>{ $("fsTxt").textContent = fsEl()? "Sair da tela cheia" : "Tela cheia"; };
+  document.addEventListener("fullscreenchange",fsSync); document.addEventListener("webkitfullscreenchange",fsSync);
+}
+let rz; window.addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ if(state.sel&&state.datasets[state.sel]) renderChart(compute(state.sel)); },150); });
+
+/* ---------- início ---------- */
+lsLoad();
+renderAll();
+(async()=>{ if(await autoLoadDataFile()) renderAll(); await initDb(); })();
+window.__painel = {state, extract, parseSpreadsheetML, compute, handleFile};
+})();
+</script>
+</body>
+</html>

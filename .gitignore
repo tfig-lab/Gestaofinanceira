@@ -1,0 +1,6 @@
+# Dados de clientes: não versionar
+*.xls
+*.xlsx
+*.csv
+dados.json
+painel-projetos-*.json
