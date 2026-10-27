@@ -217,11 +217,8 @@ details[open] summary{margin-bottom:10px}
     <div class="importer">
       <span id="syncChip" class="chip plain"><span class="dot"></span><span id="syncTxt">Conectando…</span></span>
       <button class="btn" id="fsBtn" type="button" hidden><svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg><span id="fsTxt">Tela cheia</span></button>
-      <label class="btn" for="fileJson" title="Carrega um arquivo .json salvo antes, com dados e parâmetros">Carregar dados</label>
-      <button class="btn" id="expBtn" type="button" title="Baixa um .json com os dados importados e os parâmetros de cada projeto">Salvar dados</button>
       <label class="btn primary" for="file">Importar planilha</label>
-      <input type="file" id="file" accept=".xls,.xlsx,.xml,.csv,.json">
-      <input type="file" id="fileJson" accept=".json,application/json">
+      <input type="file" id="file" accept=".xls,.xlsx,.xml,.csv">
     </div>
   </header>
 
@@ -230,10 +227,7 @@ details[open] summary{margin-bottom:10px}
   <section id="empty" class="drop" hidden>
     <h2>Arraste aqui a planilha de horas e despesas</h2>
     <p class="muted" style="margin:0;max-width:60ch">O arquivo exportado com as abas <b>TIME</b> e <b>EXPENSE</b> (.xls, .xlsx). O painel separa cada engagement, calcula horas, valor a tabela, receita pela realização e o saldo até a data limite.</p>
-    <div class="importer" style="justify-content:center">
-      <label class="btn primary" for="file">Escolher planilha</label>
-      <label class="btn" for="fileJson">Carregar dados salvos (.json)</label>
-    </div>
+    <label class="btn primary" for="file">Escolher planilha</label>
   </section>
 
   <nav id="tabs" class="tabs" role="tablist" aria-label="Projetos"></nav>
@@ -341,7 +335,11 @@ function parseBR(str){
 const fmtValorInput = v => v==null ? "" : new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2}).format(v);
 
 /* ---------- estado ---------- */
-const DEFAULTS = {}; // parâmetros iniciais por engagement, se quiser fixar algum no código
+// Parâmetros fixos por engagement. Projetos novos são preenchidos no painel à esquerda.
+const DEFAULTS = {
+  "2002383923": {real:17, valor:850000, base:"bruto", imposto:14.25, prazo:"2026-12"},   // Coop. Holambra - COI Design
+  "2002396135": {real:20, valor:1428170.65, base:"liq", prazo:"2027-06"}                 // CoE Supply Chain - Wave 2
+};
 const state = { datasets:{}, settings:{}, sel:null, view:"res", expMonth:"all", db:null, shared:false };
 const LS_KEY = "painel-fin-v1";
 function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||"null"); if(j){ state.settings=j.settings||{}; if(!state.shared) state.datasets=j.datasets||{}; state.sel=j.sel||null; } }catch(e){} }
@@ -349,7 +347,7 @@ function lsSave(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({settings:st
 function getSet(eng){
   const s = state.settings[eng] || {};
   const d = DEFAULTS[eng] || {};
-  return { real: s.real ?? d.real ?? null, valor: s.valor ?? null, base: s.base || "liq", imposto: s.imposto ?? 14.25, prazo: s.prazo ?? d.prazo ?? "", deduzir: s.deduzir ?? false };
+  return { real: s.real ?? d.real ?? null, valor: s.valor ?? d.valor ?? null, base: s.base || d.base || "liq", imposto: s.imposto ?? d.imposto ?? 14.25, prazo: s.prazo || d.prazo || "", deduzir: s.deduzir ?? d.deduzir ?? false };
 }
 function liquido(s){ if(s.valor==null) return null; return s.base==="bruto" ? s.valor*(1-(s.imposto||0)/100) : s.valor; }
 
@@ -753,82 +751,9 @@ async function initDb(){
   },()=>setSync("warn","Sem conexão com o armazenamento"));
 }
 
-/* ---------- arquivo de dados (.json) ---------- */
-const APP_ID="painel-financeiro-projetos";
-function buildExport(){
-  return {app:APP_ID, version:1, exportedAt:new Date().toISOString(), settings:state.settings,
-    datasets:Object.fromEntries(Object.entries(state.datasets).map(([k,d])=>[k,{eng:d.eng||k,desc:d.desc,client:d.client,fileName:d.fileName,importedAt:d.importedAt,time:d.time,exp:d.exp}]))};
-}
-async function exportData(){
-  if(!Object.keys(state.datasets).length){ showMsg("err","Ainda não há dados para salvar. Importe uma planilha primeiro."); return; }
-  const txt=JSON.stringify(buildExport());
-  const fname=`painel-projetos-${isoDate(new Date())}.json`;
-  let dl=null; try{ dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; }catch(e){ dl=null; }
-  if(dl){
-    try{ await dl.save({filename:fname, data:txt}); showMsg("info",`Arquivo <b>${esc(fname)}</b> salvo.`); }
-    catch(e){ if(e&&e.code!=="declined") showMsg("err","Não foi possível salvar o arquivo nesta visualização."); }
-    return;
-  }
-  try{
-    const url=URL.createObjectURL(new Blob([txt],{type:"application/json"}));
-    const a=document.createElement("a"); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(()=>URL.revokeObjectURL(url),2000);
-    showMsg("info",`Arquivo <b>${esc(fname)}</b> baixado. Use “Carregar dados” para abri-lo depois.`);
-  }catch(e){ showMsg("err","O navegador bloqueou o download do arquivo."); }
-}
-function validJson(obj){ return obj && typeof obj==="object" && obj.datasets && typeof obj.datasets==="object"; }
-function cleanSettings(v){ return {real:toNum(v.real)??null, valor:toNum(v.valor)??null, base:v.base==="bruto"?"bruto":"liq", imposto:toNum(v.imposto)??14.25, prazo:/^\d{4}-\d{2}$/.test(v.prazo||"")?v.prazo:"", deduzir:!!v.deduzir, updatedAt:v.updatedAt||null}; }
-function cleanDataset(k,d){
-  return {eng:String(k), desc:String(d.desc||""), client:String(d.client||""), fileName:String(d.fileName||""), importedAt:d.importedAt||new Date().toISOString(),
-    time:(Array.isArray(d.time)?d.time:[]).map(r=>({d:toDate(r.d), p:String(r.p||""), l:String(r.l||""), r:toNum(r.r)||0, h:toNum(r.h)||0, v:toNum(r.v)||0})),
-    exp:(Array.isArray(d.exp)?d.exp:[]).map(e=>({d:toDate(e.d), p:String(e.p||""), t:String(e.t||"Outros"), v:toNum(e.v)||0, inv:String(e.inv||"")}))};
-}
-// mode "replace": o arquivo manda; mode "base": o que já está salvo neste navegador e for mais novo prevalece
-function applyJson(obj, mode){
-  const engs=[];
-  for(const [k,d] of Object.entries(obj.datasets)){
-    const nd=cleanDataset(k,d); nd.parts=Math.max(1,Math.ceil(Math.max(nd.time.length,nd.exp.length)/PART));
-    const cur=state.datasets[k];
-    if(mode==="base" && cur && (cur.importedAt||"")>=(nd.importedAt||"")) continue;
-    state.datasets[k]=nd; loaded[k]=nd.importedAt; engs.push(k);
-  }
-  const sets=[];
-  for(const [k,v] of Object.entries(obj.settings||{})){
-    const cur=state.settings[k];
-    if(mode==="base" && cur && (cur.updatedAt||"")>=(v.updatedAt||"")) continue;
-    state.settings[k]=cleanSettings(v); sets.push(k);
-  }
-  return {engs, sets};
-}
-async function handleJson(file){
-  let obj; try{ obj=JSON.parse(await file.text()); }catch(e){ showMsg("err",`<b>${esc(file.name)}</b> não é um arquivo de dados válido.`); return; }
-  if(!validJson(obj)){ showMsg("err",`<b>${esc(file.name)}</b> não tem o formato salvo por este painel.`); return; }
-  const {engs,sets}=applyJson(obj,"replace");
-  if(engs[0]) state.sel=engs[0];
-  lsSave(); renderAll();
-  showMsg("info",`Carregado <b>${esc(file.name)}</b>: ${engs.length} projeto(s) e ${sets.length} conjunto(s) de parâmetros.`);
-  if(state.db){
-    setSync("plain","Salvando…");
-    try{ for(const e of engs) await saveDataset(state.datasets[e]); for(const e of sets) await state.db.doc("settings/"+e).set({...state.settings[e], updatedAt:state.settings[e].updatedAt||new Date().toISOString()}); setSync("ok","Salvo para a equipe"); }
-    catch(e){ setSync("warn","Dados só neste navegador"); }
-  }
-}
-// Fora do Claude (ex.: GitHub Pages): se existir um dados.json ao lado da página, ele é carregado ao abrir
-async function autoLoadDataFile(){
-  if(window.claude || location.protocol==="file:") return false;
-  try{
-    const r=await fetch("dados.json",{cache:"no-store"}); if(!r.ok) return false;
-    const obj=await r.json(); if(!validJson(obj)) return false;
-    const {engs}=applyJson(obj,"base"); lsSave();
-    if(engs.length) setSync("plain","Dados de dados.json");
-    return true;
-  }catch(e){ return false; }
-}
-
 /* ---------- eventos ---------- */
 async function handleFile(file){
   if(!file) return;
-  if(/\.json$/i.test(file.name)) return handleJson(file);
   try{
     const {out,nTime,nExp}=await readFile(file);
     const engs=Object.keys(out);
@@ -841,8 +766,6 @@ async function handleFile(file){
   }catch(err){ showMsg("err",`Não consegui ler <b>${esc(file.name)}</b>. Exporte novamente como Excel (.xls ou .xlsx) e tente outra vez.`); }
 }
 $("file").addEventListener("change",e=>{ handleFile(e.target.files[0]); e.target.value=""; });
-$("fileJson").addEventListener("change",e=>{ const f=e.target.files[0]; if(f) handleJson(f); e.target.value=""; });
-$("expBtn").addEventListener("click",exportData);
 ["dragenter","dragover"].forEach(t=>document.addEventListener(t,e=>{ if(e.dataTransfer&&[...e.dataTransfer.types].includes("Files")){ e.preventDefault(); $("empty").classList.add("over"); } }));
 ["dragleave","drop"].forEach(t=>document.addEventListener(t,e=>{ $("empty").classList.remove("over"); }));
 document.addEventListener("drop",e=>{ if(e.dataTransfer&&e.dataTransfer.files.length){ e.preventDefault(); handleFile(e.dataTransfer.files[0]); } });
@@ -883,7 +806,7 @@ let rz; window.addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout((
 /* ---------- início ---------- */
 lsLoad();
 renderAll();
-(async()=>{ if(await autoLoadDataFile()) renderAll(); await initDb(); })();
+initDb();
 window.__painel = {state, extract, parseSpreadsheetML, compute, handleFile};
 })();
 </script>

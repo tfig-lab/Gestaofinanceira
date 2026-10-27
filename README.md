@@ -14,14 +14,8 @@ Painel em uma única página (HTML + JavaScript, sem servidor) para acompanhar a
 
 1. Abra a página (GitHub Pages ou `index.html` direto no navegador).
 2. **Importar planilha**: escolha o .xls/.xlsx exportado. Cada engagement vira um card.
-3. Em cada projeto, preencha a realização, o valor final (líquido ou bruto + % de imposto) e a data limite.
-4. **Salvar dados** baixa um `.json` com os dados importados e os parâmetros. **Carregar dados** abre esse arquivo depois, em outro computador ou navegador.
-
-Os parâmetros e a última planilha ficam guardados no navegador (localStorage). Se o navegador for limpo, recarregue pelo `.json`.
-
-### Carregar automaticamente
-
-Se existir um arquivo `dados.json` (o mesmo gerado por **Salvar dados**) na mesma pasta do `index.html` publicado, a página o carrega ao abrir. Se o navegador tiver algo salvo mais recente, prevalece o do navegador.
+3. Os parâmetros dos projetos já cadastrados (realização, valor final, imposto e data limite) ficam fixos no código, em `DEFAULTS` no `index.html`.
+4. Para um projeto novo, preencha os parâmetros no painel à esquerda. Eles ficam salvos neste navegador.
 
 ## Publicar no GitHub Pages
 
@@ -31,7 +25,7 @@ Se existir um arquivo `dados.json` (o mesmo gerado por **Salvar dados**) na mesm
 
 ## Confidencialidade
 
-A planilha é lida só no navegador e nada é enviado a servidores. Mas **não suba a planilha nem o `dados.json` para um repositório público**, porque eles têm nomes, taxas e valores de clientes. O `.gitignore` já ignora esses arquivos. Para usar o `dados.json` automático, prefira um repositório privado. Lembre que, dependendo do plano, o GitHub Pages pode publicar até repositórios privados de forma aberta.
+A planilha é lida só no navegador e nada é enviado a servidores. **Não suba a planilha para o repositório**, porque ela tem nomes, taxas e valores de clientes. O `.gitignore` já ignora esses arquivos.
 
 ## Dependências
 
