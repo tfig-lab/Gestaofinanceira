@@ -16,7 +16,8 @@ Painel em uma única página (HTML + JavaScript, sem servidor) para acompanhar a
 1. Abra a página (GitHub Pages ou `index.html` direto no navegador).
 2. **Importar planilha**: escolha o .xls/.xlsx exportado. Cada engagement vira um card.
 3. Os parâmetros dos projetos já cadastrados (realização, valor líquido e data limite) ficam fixos no código, em `DEFAULTS` no `index.html`. Todos os valores do painel são líquidos de impostos.
-4. Para um projeto novo, preencha os parâmetros no painel à esquerda. Eles ficam salvos neste navegador.
+4. Para um projeto novo, preencha os parâmetros no painel. Eles ficam salvos neste navegador.
+5. **Salvar** baixa uma cópia do painel (`.html`) com a planilha, os parâmetros e as regras de horas embutidos. Abra o arquivo, faça login e o painel aparece já preenchido. Não suba essas cópias para o repositório: elas contêm os dados dos clientes.
 
 ## Publicar no GitHub Pages
 

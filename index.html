@@ -246,6 +246,7 @@ td.vs{font-size:.78rem;color:var(--muted)}
       <span class="userchip" id="userChip"></span><button class="btn link" id="logoutBtn" type="button">Sair</button>
       <span id="syncChip" class="sync"><span class="dot"></span><span id="syncTxt">Conectando…</span></span>
       <button class="btn" id="fsBtn" type="button" hidden><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg><span id="fsTxt">Tela cheia</span></button>
+      <button class="btn" id="saveBtn" type="button" title="Baixa uma cópia do painel com a planilha, os parâmetros e as regras de horas já carregados">Salvar</button>
       <label class="btn primary" for="file">Importar planilha</label>
       <input type="file" id="file" accept=".xls,.xlsx,.xml,.csv">
     </div>
@@ -337,9 +338,10 @@ td.vs{font-size:.78rem;color:var(--muted)}
   </div>
 </div>
 
-<script>
+<script id="app-js">
 (() => {
 "use strict";
+const BOOT_HTML = document.documentElement.outerHTML; // cópia limpa da página, usada pelo botão Salvar
 /* ---------- formatação ---------- */
 const BRL = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0});
 const BRL2 = new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2});
@@ -966,7 +968,7 @@ async function loadDatasetDoc(snap){
 async function initDb(){
   let db=null;
   try{ db = window.claude && window.claude.use ? await window.claude.use("db") : null; }catch(e){ db=null; }
-  if(!db){ setSync("plain","Salvo só neste navegador"); renderAll(); return; }
+  if(!db){ setSync("plain", state.snapshotAt ? `Cópia salva em ${new Date(state.snapshotAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}` : "Salvo só neste navegador"); renderAll(); return; }
   state.db=db; state.shared=true;
   db.collection("settings").onSnapshot(snap=>{
     for(const d of snap.docs){ const v=d.data(); state.settings[d.id]={real:v.real??null, valor:v.valor??null, prazo:v.prazo??"", deduzir:!!v.deduzir, reserva:v.reserva??5, ded:(v.ded&&typeof v.ded==="object")?v.ded:{}}; }
@@ -1040,11 +1042,58 @@ if(document.fullscreenEnabled||document.webkitFullscreenEnabled){
 }
 let rz; window.addEventListener("resize",()=>{ clearTimeout(rz); rz=setTimeout(()=>{ if(state.sel&&state.datasets[state.sel]) renderChart(compute(state.sel)); },150); });
 
+/* ---------- salvar cópia com os dados ---------- */
+function snapshotData(){
+  const datasets=Object.fromEntries(Object.entries(state.datasets).map(([k,d])=>[k,{eng:d.eng||k,desc:d.desc,client:d.client,fileName:d.fileName,importedAt:d.importedAt,parts:d.parts||1,time:d.time,exp:d.exp}]));
+  return {app:"painel-financeiro-projetos", savedAt:new Date().toISOString(), settings:state.settings, people:state.people||{}, datasets};
+}
+function buildSnapshotHtml(){
+  const doc=new DOMParser().parseFromString(BOOT_HTML,"text/html");
+  // mantém só os scripts do próprio painel (leitor de Excel e código do app)
+  for(const sc of [...doc.querySelectorAll("script")]){ const src=sc.getAttribute("src")||""; if(!(sc.id==="app-js" || /cdnjs\.cloudflare\.com\/ajax\/libs\/xlsx\//.test(src))) sc.remove(); }
+  doc.querySelectorAll("#painel-snapshot").forEach(n=>n.remove());
+  const data=doc.createElement("script"); data.type="application/json"; data.id="painel-snapshot";
+  data.textContent=JSON.stringify(snapshotData()).replace(/</g,"\\u003c");
+  const app=doc.getElementById("app-js"); app.parentNode.insertBefore(data, app);
+  return "<!doctype html>\n"+doc.documentElement.outerHTML;
+}
+async function saveSnapshot(){
+  if(!Object.keys(state.datasets).length){ showMsg("err","Importe uma planilha antes de salvar."); return; }
+  let html; try{ html=buildSnapshotHtml(); }catch(e){ showMsg("err","Não foi possível montar a cópia do painel."); return; }
+  const fname=`painel-projetos-${isoDate(new Date())}.html`;
+  let dl=null; try{ dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; }catch(e){ dl=null; }
+  if(dl){
+    try{ await dl.save({filename:fname, data:html}); showMsg("info",`<b>${esc(fname)}</b> salvo. Abra esse arquivo para ver o painel com os dados de hoje.`); }
+    catch(e){ if(!e || e.code!=="declined") showMsg("err","Não foi possível salvar o arquivo nesta visualização."); }
+    return;
+  }
+  try{
+    const url=URL.createObjectURL(new Blob([html],{type:"text/html"}));
+    const a=document.createElement("a"); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),3000);
+    showMsg("info",`<b>${esc(fname)}</b> baixado. Abra esse arquivo para ver o painel com os dados de hoje.`);
+  }catch(e){ showMsg("err","O navegador bloqueou o download."); }
+}
+// abre uma cópia salva: o que estiver no arquivo entra, a menos que este navegador tenha algo mais novo
+function loadSnapshot(){
+  const el=document.getElementById("painel-snapshot"); if(!el) return false;
+  let snap; try{ snap=JSON.parse(el.textContent); }catch(e){ return false; }
+  if(!snap || typeof snap.datasets!=="object") return false;
+  for(const [k,d] of Object.entries(snap.datasets)){ const cur=state.datasets[k]; if(!cur || (cur.importedAt||"")<(d.importedAt||"")){ state.datasets[k]=d; } }
+  for(const [k,v] of Object.entries(snap.settings||{})){ const cur=state.settings[k]; if(!cur || (cur.updatedAt||"")<(v.updatedAt||"")) state.settings[k]=v; }
+  state.people={...(snap.people||{}), ...(state.people||{})};
+  if(!state.sel) state.sel=Object.keys(snap.datasets)[0]||null;
+  state.snapshotAt=snap.savedAt;
+  return true;
+}
+$("saveBtn").addEventListener("click",saveSnapshot);
+
 /* ---------- acesso ---------- */
 // usuários autorizados: SHA-256 de "usuário:senha"
 const USERS = {
   "admintf":"fa132385d7f47c88028a939146ac1ad31bac7e7c47a3e7b67960482e9c34b7ec",
-  "adminhp":"3987905aa3c846c5a57004423561c4bfcb322e544bf72a27829aa79b6a748e6a"
+  "adminhp":"3987905aa3c846c5a57004423561c4bfcb322e544bf72a27829aa79b6a748e6a",
+  "adminfs":"5aede6ee183a8e33e4e96f5f67dbb4d4af387f27be4e3a62593679d313efcf73"
 };
 const AUTH_KEY="painel-fin-auth";
 async function sha256(t){ const b=await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t)); return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join(""); }
@@ -1067,6 +1116,7 @@ $("logoutBtn").addEventListener("click",()=>{ try{ sessionStorage.removeItem(AUT
 
 /* ---------- início ---------- */
 lsLoad();
+if(loadSnapshot()) lsSave();
 renderAll();
 initDb();
 window.__painel = {state, extract, parseSpreadsheetML, compute, handleFile};
