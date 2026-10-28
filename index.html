@@ -219,6 +219,8 @@ table.plan td,table.plan th{padding:7px 8px}
 tr.off td{color:var(--muted)} tr.off .who{text-decoration:line-through}
 td.full{font-weight:700;color:var(--accent)}
 .warnc{color:var(--warn)}
+.reshint{font-size:.76rem;color:var(--muted);align-self:center;max-width:260px}
+.reshint b{color:var(--warn)}
 
 td.vs{font-size:.78rem;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.bar .fill,.share .sb b,.cat .tr b,.mini b{transition:width .35s ease}}
@@ -275,7 +277,7 @@ td.vs{font-size:.78rem;color:var(--muted)}
           <div class="nm"><h2 id="pName"></h2><span id="pStatus"></span></div>
         </div>
         <div class="assume" aria-label="Premissas">
-          <div class="field f-real"><label for="inReal">Realização</label><div class="inp"><input id="inReal" type="number" inputmode="decimal" min="0" max="200" step="0.1"><span>%</span></div></div>
+          <div class="field f-real"><label for="inReal">Realização</label><div class="inp"><input id="inReal" type="text" inputmode="decimal"><span>%</span></div></div>
           <div class="field f-val"><label for="inValor">Valor líquido do projeto</label><div class="inp"><span>R$</span><input id="inValor" type="text" inputmode="decimal" placeholder="0,00"></div></div>
           <div class="field f-prazo"><label for="inPrazo">Data limite</label><div class="inp"><input id="inPrazo" type="month"></div></div>
           <label class="check"><input id="inDesp" type="checkbox"><span>Descontar despesas do saldo</span></label>
@@ -306,7 +308,8 @@ td.vs{font-size:.78rem;color:var(--muted)}
     <section class="card c12" aria-label="Planejamento de horas" data-view="plano" hidden>
       <div class="card-hd"><h3>Planejamento de horas por profissional</h3>
         <div class="assume">
-          <div class="field f-real"><label for="inRes">Reserva no fim</label><div class="inp"><input id="inRes" type="number" inputmode="decimal" min="0" max="50" step="0.5"><span>%</span></div></div>
+          <div class="field f-real"><label for="inRes">Reserva no fim</label><div class="inp"><input id="inRes" type="text" inputmode="decimal"><span>%</span></div></div>
+          <span class="reshint" id="resHint"></span>
           
         </div>
       </div>
@@ -607,10 +610,10 @@ function statusOf(c){
 function renderParams(){
   const e=state.sel, s=getSet(e), ds=state.datasets[e];
   const ae=document.activeElement;
-  if(ae!==$("inReal")) $("inReal").value = s.real ?? "";
+  if(ae!==$("inReal")) $("inReal").value = s.real==null ? "" : new Intl.NumberFormat("pt-BR",{maximumFractionDigits:2}).format(s.real);
   if(ae!==$("inValor")) $("inValor").value = fmtValorInput(s.valor);
   if(ae!==$("inPrazo")) $("inPrazo").value = s.prazo || "";
-  if(ae!==$("inRes")) $("inRes").value = s.reserva ?? 5;
+  if(ae!==$("inRes")) $("inRes").value = new Intl.NumberFormat("pt-BR",{maximumFractionDigits:2}).format(s.reserva ?? 5);
   $("inDesp").checked = !!s.deduzir;
   $("pEyebrow").textContent = `${titleCase(ds.client)} · Eng. ${e}`;
   $("pName").textContent = ds.desc || e;
@@ -734,10 +737,14 @@ function planOf(c){
 }
 function renderPlan(c){
   const P=planOf(c);
-  if(P.err){ $("planSum").innerHTML=""; $("plan").innerHTML=`<div class="notice">${esc(P.err)}</div>`; return; }
+  if(P.err){ $("resHint").innerHTML=""; $("planSum").innerHTML=""; $("plan").innerHTML=`<div class="notice">${esc(P.err)}</div>`; return; }
   const rows=P.people;
   const planned=rows.reduce((a,x)=>a+x.hrs.reduce((s,h)=>s+h,0)*x.cost,0);
   const sobra=P.left.reduce((a,b)=>a+b,0);
+  // menor reserva alcançável: o que sobra com toda a equipe ativa na capacidade máxima
+  const capAll=rows.reduce((a,x)=>a+x.cap.reduce((s2,h)=>s2+h,0)*x.cost,0);
+  const minRes = c.valor>0 ? Math.max(0,(c.valor-c.consumo-capAll)/c.valor*100) : 0;
+  $("resHint").innerHTML = minRes>0.05 ? `Mínimo possível com a equipe atual: <b>${N1.format(minRes)}%</b>${(P.reserva*100)<minRes-0.05?` · abaixo disso as horas não mudam`:""}` : "";
   const totH=rows.reduce((a,x)=>a+x.hrs.reduce((s,h)=>s+h,0),0);
   $("planSum").innerHTML = `
     <div><span>A consumir até o fim</span><b class="${P.alvo<0?"neg":""}">${money(P.alvo)}</b></div>
@@ -779,17 +786,43 @@ function savePeople(){
   clearTimeout(savePeople.t);
   savePeople.t=setTimeout(async()=>{ try{ await state.db.doc("config/pessoas").set({pessoas:state.people||{}, updatedAt:new Date().toISOString()}); }catch(e){ setSync("warn","Regras só neste navegador"); } },500);
 }
+// quanto da capacidade da pessoa o plano usa (1 = cheia). Sem plano possível, considera cheia.
+function usedShare(eng, name){
+  const P=planOf(compute(eng)); if(P.err || P.alvo<=0) return null;
+  const x=P.people.find(r=>r.p.p===name); if(!x || !x.cfg.ativo) return null;
+  const capT=x.cap.reduce((a,b)=>a+b,0), hT=x.hrs.reduce((a,b)=>a+b,0);
+  return capT>0 ? Math.min(1,hT/capT) : 1;
+}
 function onPlanInput(e){
   const el=e.target; const tr=el.closest("tr[data-p]"); if(!tr||!el.dataset.k) return;
   const name=tr.dataset.p, k=el.dataset.k;
-  if(k==="ded"){
-    const s=state.settings[state.sel]={...getSet(state.sel)}; s.ded={...(s.ded||{}), [name]: Math.max(0,Math.min(100,parseBR(el.value)??100))}; s.updatedAt=new Date().toISOString();
-    saveSettings(state.sel);
-  } else {
-    state.people=state.people||{}; const cur={...(state.people[name]||{})};
-    if(k==="ativo") cur.ativo=el.checked; else { const v=parseBR(el.value); if(v!=null) cur[k]=v; }
-    state.people[name]=cur; savePeople();
+  const fmt=v=>new Intl.NumberFormat("pt-BR",{maximumFractionDigits:1}).format(v);
+  const STEP={ded:1, cap:1, hd:0.5}, LBL={ded:"Neste projeto", cap:"Máx. jornada", hd:"h/dia"}, UN={ded:"%", cap:"%", hd:" h"};
+  const getVal=()=> k==="ded" ? (getSet(state.sel).ded||{})[name] : personCfg(name)[k];
+  const setVal=v=>{
+    if(k==="ded"){ const s=state.settings[state.sel]={...getSet(state.sel)}; s.ded={...(s.ded||{}), [name]:v}; s.updatedAt=new Date().toISOString(); }
+    else { state.people=state.people||{}; state.people[name]={...(state.people[name]||{}), [k]:v}; }
+  };
+  if(k==="ativo"){
+    state.people=state.people||{}; state.people[name]={...(state.people[name]||{}), ativo:el.checked}; savePeople();
+    renderPlan(compute(state.sel)); return;
   }
+  let v=parseBR(el.value); if(v==null){ renderPlan(compute(state.sel)); return; }
+  v=Math.max(0, Math.min(k==="hd"?12:100, v));
+  const before = k==="ded" ? ((getSet(state.sel).ded||{})[name] ?? defaultDed(state.sel,name)) : personCfg(name)[k];
+  setVal(v);
+  // não deixa subir além do que o plano consegue usar até a reserva
+  if(v>before){
+    const engs = k==="ded" ? [state.sel] : Object.keys(state.datasets).filter(e=>compute(e).people.some(p=>p.p===name));
+    let need=0, any=false;
+    for(const e of engs){ const u=usedShare(e,name); if(u==null) continue; any=true; need=Math.max(need,u); }
+    if(any && need<0.999){
+      let lim=Math.floor((v*need)/STEP[k])*STEP[k]; lim=Math.max(before, lim);
+      setVal(lim);
+      showMsg("info",`${esc(LBL[k])} de <b>${esc(name)}</b> limitado a <b>${fmt(lim)}${UN[k]}</b>. Acima disso o projeto passaria da reserva definida, e as horas extras não seriam usadas.`);
+    }
+  }
+  if(k==="ded") saveSettings(state.sel); else savePeople();
   renderPlan(compute(state.sel));
 }
 
