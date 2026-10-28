@@ -12,19 +12,19 @@
 /* Layout: dashboard de largura total. Barra de topo, carteira, cabeçalho do projeto com premissas, 4 KPIs e grade de 12 colunas com gráficos e tabelas */
 :root{
   --page:#F2F4F8; --card:#FFFFFF; --ink:#0B1F33; --muted:#5A6A7E; --line:#DDE3EB; --rule:#0B1F33;
-  --accent:#00338D; --accent-2:#1E49E2; --on-accent:#FFFFFF; --plan:#C3D1EC; --soft:#EDF1F9; --pace:#7213EA;
+  --accent:#00338D; --accent-2:#1E49E2; --on-accent:#FFFFFF; --plan:#C3D1EC; --soft:#EDF1F9; --pace:#7213EA; --expc:#00A3A1;
   --ok:#1B7A47; --ok-soft:#E3F3EA; --warn:#A15C00; --warn-soft:#FBF0DD; --bad:#B4232F; --bad-soft:#FBEAEC;
   --shadow:0 1px 2px rgba(11,31,51,.05);
   --f-body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --page:#08121E; --card:#0F1D2E; --ink:#E7EDF5; --muted:#9AA9BB; --line:#223246; --rule:#C9D4E3;
-  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#08121E; --plan:#2A3D63; --soft:#162841; --pace:#C09BFF;
+  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#08121E; --plan:#2A3D63; --soft:#162841; --pace:#C09BFF; --expc:#3FD1CE;
   --ok:#5CC98E; --ok-soft:#14301F; --warn:#E8B15A; --warn-soft:#33270F; --bad:#FF8A8A; --bad-soft:#3A1C22;
   --shadow:none; color-scheme:dark }}
 :root[data-theme="dark"]{
   --page:#08121E; --card:#0F1D2E; --ink:#E7EDF5; --muted:#9AA9BB; --line:#223246; --rule:#C9D4E3;
-  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#08121E; --plan:#2A3D63; --soft:#162841; --pace:#C09BFF;
+  --accent:#86A6FF; --accent-2:#5B86FF; --on-accent:#08121E; --plan:#2A3D63; --soft:#162841; --pace:#C09BFF; --expc:#3FD1CE;
   --ok:#5CC98E; --ok-soft:#14301F; --warn:#E8B15A; --warn-soft:#33270F; --bad:#FF8A8A; --bad-soft:#3A1C22;
   --shadow:none; color-scheme:dark }
 
@@ -140,6 +140,8 @@ th.hl,td.hl{background:var(--soft)}
 .bar{position:relative;height:16px;background:var(--soft);border-radius:3px}
 .bar .fill{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:3px}
 .bar .fill.over{background:var(--bad)}
+.bar .fill.exp{background:var(--expc);border-radius:0 3px 3px 0}
+.mini b.exp{background:var(--expc);border-radius:0 3px 3px 0}
 .bar .mark{position:absolute;top:-6px;bottom:-6px;width:2px;background:var(--ink)}
 .scale{display:flex;justify-content:space-between;font-size:.74rem;color:var(--muted)}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-top:1px solid var(--line)}
@@ -291,7 +293,7 @@ td.vs{font-size:.78rem;color:var(--muted)}
     <div class="c12 dash" id="kpis" data-view="geral"></div>
     <section class="card c8" aria-label="Receita por mês" data-view="geral">
       <div class="card-hd"><h3>Receita por mês</h3>
-        <div class="legend"><span><i style="background:var(--accent)"></i>Realizada</span><span><i style="background:var(--plan)"></i>Disponível</span><span><i style="background:var(--pace);height:2px;vertical-align:3px"></i>Ritmo atual</span></div>
+        <div class="legend"><span><i style="background:var(--accent)"></i>Realizada</span><span id="legExp" hidden><i style="background:var(--expc)"></i>Despesas</span><span><i style="background:var(--plan)"></i>Disponível</span><span><i style="background:var(--pace);height:2px;vertical-align:3px"></i>Ritmo atual</span></div>
       </div>
       <div class="chart" id="chart"></div>
     </section>
@@ -509,6 +511,7 @@ function compute(eng, dsOv){
     if(r.d){const k=r.d.slice(0,7); P.mh[k]=(P.mh[k]||0)+r.h; P.mv[k]=(P.mv[k]||0)+r.v;}
   }
   const desp=ds.exp.reduce((a,e)=>a+e.v,0);
+  const expByMonth={}; for(const e of ds.exp){ if(e.d){ const k=e.d.slice(0,7); expByMonth[k]=(expByMonth[k]||0)+e.v; } }
   const receita=tab*real;
   const consumo=receita+(s.deduzir?desp:0);
   const valor=liquido(s);
@@ -532,7 +535,7 @@ function compute(eng, dsOv){
   if(saldo!=null && saldo>0 && ritmo>0){ const days=saldo/(ritmo/30.44); runOut=new Date(today.getTime()+days*864e5); }
   let elapsed=null;
   if(minD && end){ const st=new Date(minD+"T00:00:00"); elapsed=Math.max(0,Math.min(1,(today-st)/(end-st))); }
-  return {ds,s,real,hours,tab,receita,desp,consumo,valor,saldo,end,monthsLeft,frac,futureMonths,saldoMes,tabMes,horasMes,blended,ritmo,runOut,elapsed,minD,maxD,byMonth,people:Object.values(people),curM,today};
+  return {ds,s,real,hours,tab,receita,desp,consumo,valor,saldo,end,monthsLeft,frac,futureMonths,saldoMes,tabMes,horasMes,blended,ritmo,runOut,elapsed,minD,maxD,byMonth,expByMonth,people:Object.values(people),curM,today};
 }
 
 /* ---------- ano fiscal (FY de outubro a setembro: FY26 = out/25 a set/26) ---------- */
@@ -586,7 +589,7 @@ function renderPortfolio(engs){
       <td class="n">${c.s.real==null?"—":money(c.F.receita)}</td>
       <td class="n">${money(c.valor)}</td>
       <td class="n ${c.saldo!=null&&c.saldo<0?"neg":""}"><b>${money(c.saldo)}</b></td>
-      <td class="barcell">${used==null?'<span class="muted">—</span>':`<div class="minirow"><div class="mini" title="${PCT(used)} do orçamento consumido${c.elapsed!=null?` · ${PCT(c.elapsed)} do prazo decorrido`:""}"><b class="${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></b>${c.elapsed!=null?`<i style="left:calc(${c.elapsed*100}% - 1px)"></i>`:""}</div><span>${N0.format(used*100)}%</span></div>`}</td>
+      <td class="barcell">${used==null?'<span class="muted">—</span>':`<div class="minirow"><div class="mini" title="${PCT(used)} do orçamento consumido${c.elapsed!=null?` · ${PCT(c.elapsed)} do prazo decorrido`:""}">${c.s.deduzir&&c.desp>0&&c.valor>0 ? `<b class="${used>1?"over":""}" style="width:${Math.min(100,c.receita/c.valor*100)}%"></b><b class="exp" style="left:${Math.min(100,c.receita/c.valor*100)}%;width:${Math.max(0,Math.min(100,used*100)-Math.min(100,c.receita/c.valor*100))}%"></b>` : `<b class="${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></b>`}${c.elapsed!=null?`<i style="left:calc(${c.elapsed*100}% - 1px)"></i>`:""}</div><span>${N0.format(used*100)}%</span></div>`}</td>
       <td class="n">${money(c.saldoMes)}</td>
       <td class="n">${c.s.prazo? monthLabel(c.s.prazo):"—"}</td>
       <td><span class="st ${st.cls}"><i></i>${esc(st.short)}</span></td></tr>`;
@@ -634,10 +637,12 @@ function renderDetail(){
     const used=c.consumo/c.valor;
     $("burn").innerHTML = `
       <div class="bar" role="img" aria-label="${PCT(used)} do orçamento consumido">
-        <div class="fill ${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></div>
+        ${c.s.deduzir && c.desp>0
+          ? `<div class="fill ${used>1?"over":""}" style="width:${Math.min(100,c.receita/c.valor*100)}%" title="Débito de horas ${money(c.receita)}"></div><div class="fill exp" style="left:${Math.min(100,c.receita/c.valor*100)}%;width:${Math.max(0,Math.min(100,used*100)-Math.min(100,c.receita/c.valor*100))}%" title="Despesas ${money(c.desp)}"></div>`
+          : `<div class="fill ${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></div>`}
         ${c.elapsed!=null? `<div class="mark" style="left:calc(${c.elapsed*100}% - 1px)" title="Prazo decorrido"></div>`:""}
       </div>
-      <div class="legend"><span><i style="background:var(--accent)"></i>Consumido</span><span><i style="background:var(--ink);width:2px"></i>Prazo decorrido</span></div>
+      <div class="legend"><span><i style="background:var(--accent)"></i>${c.s.deduzir&&c.desp>0?"Débito de horas":"Consumido"}</span>${c.s.deduzir&&c.desp>0?`<span><i style="background:var(--expc)"></i>Despesas</span>`:""}<span><i style="background:var(--ink);width:2px"></i>Prazo decorrido</span></div>
       <div class="stats">
         <div><b>${PCT(used)}</b><span>orçamento consumido</span></div>
         <div><b>${c.elapsed!=null?PCT(c.elapsed):"—"}</b><span>prazo decorrido</span></div>
@@ -797,26 +802,30 @@ function renderChart(c){
     const act=(c.byMonth[k]||0)*c.real;
     let plan=0;
     if(allow && c.s.prazo && k>=c.curM && k<=c.s.prazo) plan = k===c.curM ? allow*c.frac : allow;
-    return {k,act,plan};
+    const exp = c.s.deduzir ? Math.max(0, c.expByMonth[k]||0) : 0;
+    return {k,act,exp,plan};
   });
   const box=$("chart"); const W=Math.max(box.clientWidth||600, months.length*56); const H=280;
   const m={t:24,r:100,b:30,l:8};
   const pace=c.ritmo>0? c.ritmo : 0;
-  const max=Math.max(1,pace,...data.map(d=>d.act+d.plan));
+  const max=Math.max(1,pace,...data.map(d=>d.act+d.exp+d.plan));
   const y=v=>m.t+(H-m.t-m.b)*(1-v/(max*1.08));
   const bw=(W-m.l-m.r)/data.length; const w=Math.min(64,bw*0.6);
   let g=`<line x1="${m.l}" x2="${W-m.r}" y1="${y(0)}" y2="${y(0)}" stroke="var(--rule)" stroke-width="1"/>`;
   data.forEach((d,i)=>{
     const x=m.l+bw*i+(bw-w)/2;
     if(d.act>0) g+=`<rect x="${x}" y="${y(d.act)}" width="${w}" height="${y(0)-y(d.act)}" fill="var(--accent)" rx="2"><title>${monthLabel(d.k)} · realizada ${money(d.act)}</title></rect>`;
-    if(d.plan>0) g+=`<rect x="${x}" y="${y(d.act+d.plan)}" width="${w}" height="${y(d.act)-y(d.act+d.plan)}" fill="var(--plan)" rx="2"><title>${monthLabel(d.k)} · disponível ${money(d.plan)}</title></rect>`;
-    const tot=d.act+d.plan; if(tot>0) g+=`<text class="vl" x="${x+w/2}" y="${y(tot)-7}" text-anchor="middle">${compact(tot)}</text>`;
+    const b0=d.act+d.exp;
+    if(d.exp>0) g+=`<rect x="${x}" y="${y(b0)}" width="${w}" height="${y(d.act)-y(b0)}" fill="var(--expc)" rx="2"><title>${monthLabel(d.k)} · despesas ${money(d.exp)}</title></rect>`;
+    if(d.plan>0) g+=`<rect x="${x}" y="${y(b0+d.plan)}" width="${w}" height="${y(b0)-y(b0+d.plan)}" fill="var(--plan)" rx="2"><title>${monthLabel(d.k)} · disponível ${money(d.plan)}</title></rect>`;
+    const tot=b0+d.plan; if(tot>0) g+=`<text class="vl" x="${x+w/2}" y="${y(tot)-7}" text-anchor="middle">${compact(tot)}</text>`;
     g+=`<text x="${x+w/2}" y="${H-9}" text-anchor="middle" ${d.k===c.curM?'style="fill:var(--ink);font-weight:700"':""}>${monthLabel(d.k)}${d.k===c.curM?" · hoje":""}</text>`;
   });
   if(pace>0){
     g+=`<line x1="${m.l}" x2="${W-m.r+6}" y1="${y(pace)}" y2="${y(pace)}" stroke="var(--pace)" stroke-width="1.5" stroke-dasharray="5 4"/>`;
     g+=`<text class="pl" x="${W-m.r+10}" y="${y(pace)-2}">Ritmo atual</text><text class="pl" x="${W-m.r+10}" y="${y(pace)+13}">${compact(pace)}/mês</text>`;
   }
+  $("legExp").hidden = !c.s.deduzir;
   box.innerHTML=`<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="Receita realizada por mês, valor disponível até a data limite e ritmo atual">${g}</svg>`;
 }
 
