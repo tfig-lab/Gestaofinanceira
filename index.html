@@ -242,6 +242,7 @@ td.vs{font-size:.78rem;color:var(--muted)}
       <span class="eyebrow" id="asof">Gestão financeira de engagements</span>
     </div>
     <div class="actions">
+      <div class="seg" id="fySeg" role="group" aria-label="Ano fiscal"></div>
       <span class="userchip" id="userChip"></span><button class="btn link" id="logoutBtn" type="button">Sair</button>
       <span id="syncChip" class="sync"><span class="dot"></span><span id="syncTxt">Conectando…</span></span>
       <button class="btn" id="fsBtn" type="button" hidden><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg><span id="fsTxt">Tela cheia</span></button>
@@ -261,7 +262,7 @@ td.vs{font-size:.78rem;color:var(--muted)}
   <div class="dash" id="dash" hidden>
     <section class="card c12" aria-label="Carteira">
       <h3>Carteira de projetos</h3>
-      <div class="tbl"><table class="port"><thead><tr><th>Projeto</th><th class="n">Realização</th><th class="n">Receita</th><th class="n">Valor líquido</th><th class="n">Saldo líquido</th><th>Consumo × prazo</th><th class="n">Disponível/mês</th><th class="n">Data limite</th><th>Situação</th></tr></thead><tbody id="tabs"></tbody></table></div>
+      <div class="tbl"><table class="port"><thead><tr><th>Projeto</th><th class="n">Realização</th><th class="n" id="thRec">Receita</th><th class="n">Valor líquido</th><th class="n">Saldo líquido</th><th>Consumo × prazo</th><th class="n">Disponível/mês</th><th class="n">Data limite</th><th>Situação</th></tr></thead><tbody id="tabs"></tbody></table></div>
     </section>
 
     <section class="card c12" aria-label="Projeto selecionado">
@@ -374,7 +375,7 @@ const DEFAULTS = {
   "2002383923": {real:17, valor:728875.00, prazo:"2026-12"},   // Coop. Holambra - COI Design (R$ 850.000 bruto − 14,25% de impostos)
   "2002396135": {real:20, valor:1428170.65, prazo:"2027-06"}   // CoE Supply Chain - Wave 2
 };
-const state = { datasets:{}, settings:{}, sel:null, view:"res", pview:null, people:{}, expMonth:"all", db:null, shared:false };
+const state = { datasets:{}, settings:{}, sel:null, view:"res", pview:null, people:{}, fy:"all", expMonth:"all", db:null, shared:false };
 const LS_KEY = "painel-fin-v1";
 function lsLoad(){ try{ const j=JSON.parse(localStorage.getItem(LS_KEY)||"null"); if(j){ state.settings=j.settings||{}; state.people=j.people||{}; if(!state.shared) state.datasets=j.datasets||{}; state.sel=j.sel||null; } }catch(e){} }
 function lsSave(){ try{ localStorage.setItem(LS_KEY, JSON.stringify({settings:state.settings, people:state.people, datasets: state.shared?{}:state.datasets, sel:state.sel})); }catch(e){} }
@@ -489,8 +490,8 @@ async function readFile(file){
 
 /* ---------- cálculos ---------- */
 function monthsBetween(a,b){ const out=[]; let [y,m]=a.split("-").map(Number); const [y2,m2]=b.split("-").map(Number); while(y<y2||(y===y2&&m<=m2)){ out.push(`${y}-${pad(m)}`); m++; if(m>12){m=1;y++;} if(out.length>60) break; } return out; }
-function compute(eng){
-  const ds=state.datasets[eng]; const s=getSet(eng);
+function compute(eng, dsOv){
+  const ds=dsOv||state.datasets[eng]; const s=getSet(eng);
   const today=new Date(); const todayK=isoDate(today); const curM=todayK.slice(0,7);
   const real=(s.real??0)/100;
   let hours=0, tab=0, minD=null, maxD=null; const byMonth={}; const people={};
@@ -532,6 +533,31 @@ function compute(eng){
   return {ds,s,real,hours,tab,receita,desp,consumo,valor,saldo,end,monthsLeft,frac,futureMonths,saldoMes,tabMes,horasMes,blended,ritmo,runOut,elapsed,minD,maxD,byMonth,people:Object.values(people),curM,today};
 }
 
+/* ---------- ano fiscal (FY de outubro a setembro: FY26 = out/25 a set/26) ---------- */
+const fyOf = d => { const y=+d.slice(0,4), m=+d.slice(5,7); return m>=10 ? y+1 : y; };
+const fyRange = fy => ({ start:`${fy-1}-10-01`, end:`${fy}-09-30`, mStart:`${fy-1}-10`, mEnd:`${fy}-09` });
+const fyLabel = fy => "FY"+String(fy).slice(2);
+function fyList(){
+  const set=new Set([fyOf(isoDate(new Date()))]);
+  for(const [e,ds] of Object.entries(state.datasets)){ for(const r of ds.time) if(r.d) set.add(fyOf(r.d)); for(const x of ds.exp) if(x.d) set.add(fyOf(x.d)); const pz=getSet(e).prazo; if(pz) set.add(fyOf(pz+"-01")); }
+  return [...set].sort();
+}
+// c = projeto inteiro (saldo, prazo, plano); F = só o ano fiscal escolhido (receita, horas, profissionais, despesas)
+function fyView(eng){
+  const c=compute(eng);
+  if(state.fy==="all" || !state.fy) return Object.assign(c,{F:c});
+  const R=fyRange(+state.fy), ds=c.ds, inR=d=>d && d>=R.start && d<=R.end;
+  const F=compute(eng,{...ds, time:ds.time.filter(r=>inR(r.d)), exp:ds.exp.filter(x=>inR(x.d))});
+  const last={}; for(const p of c.people) last[p.p]=p;
+  for(const p of F.people){ const L=last[p.p]; if(L){ p.lastL=L.lastL; p.lastR=L.lastR; p.levels=L.levels; } }
+  return Object.assign(c,{F});
+}
+function renderFySeg(){
+  const list=fyList(); if(state.fy!=="all" && !list.includes(+state.fy)) state.fy="all";
+  $("fySeg").innerHTML=`<button data-fy="all" aria-pressed="${state.fy==="all"}">Todos</button>`+list.map(f=>`<button data-fy="${f}" aria-pressed="${String(state.fy)===String(f)}" title="${fyLabel(f)}: out/${String(f-1).slice(2)} a set/${String(f).slice(2)}">${fyLabel(f)}</button>`).join("");
+  $("thRec").textContent = state.fy==="all" ? "Receita" : `Receita ${fyLabel(+state.fy)}`;
+}
+
 /* ---------- renderização ---------- */
 const MESL=["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
 const mesAno = k => { if(!k) return "—"; const [y,m]=k.split("-"); return `${MESL[+m-1]} de ${y}`; };
@@ -542,19 +568,20 @@ function renderAll(){
   $("asof").textContent = `Posição de ${new Date().toLocaleDateString("pt-BR")}`;
   if(!engs.length){ $("tabs").innerHTML=""; return; }
   if(!state.sel || !state.datasets[state.sel]) state.sel=engs[0];
+  renderFySeg();
   renderPortfolio(engs);
   renderParams(); renderDetail();
 }
 function renderPortfolio(engs){
   engs = engs || [...$("tabs").querySelectorAll("tr[data-eng]")].map(r=>r.dataset.eng);
-  const rows=engs.map(e=>{ const c=compute(e); return {e,c,st:statusOf(c)}; });
-  const tot=rows.reduce((a,r)=>({rec:a.rec+(r.c.s.real==null?0:r.c.receita), val:a.val+(r.c.valor||0), sal:a.sal+(r.c.saldo||0), mes:a.mes+(r.c.saldoMes||0)}),{rec:0,val:0,sal:0,mes:0});
+  const rows=engs.map(e=>{ const c=fyView(e); return {e,c,st:statusOf(c)}; });
+  const tot=rows.reduce((a,r)=>({rec:a.rec+(r.c.s.real==null?0:r.c.F.receita), val:a.val+(r.c.valor||0), sal:a.sal+(r.c.saldo||0), mes:a.mes+(r.c.saldoMes||0)}),{rec:0,val:0,sal:0,mes:0});
   $("tabs").innerHTML = rows.map(({e,c,st})=>{
     const used = c.valor>0 ? c.consumo/c.valor : null;
     return `<tr data-eng="${esc(e)}" class="${e===state.sel?"sel":""}" tabindex="0" aria-selected="${e===state.sel}">
       <td><div class="pn">${esc(c.ds.desc||e)}</div><div class="pc">${esc(titleCase(c.ds.client))}</div></td>
       <td class="n">${c.s.real==null?"—":N1.format(c.s.real)+"%"}</td>
-      <td class="n">${c.s.real==null?"—":money(c.receita)}</td>
+      <td class="n">${c.s.real==null?"—":money(c.F.receita)}</td>
       <td class="n">${money(c.valor)}</td>
       <td class="n ${c.saldo!=null&&c.saldo<0?"neg":""}"><b>${money(c.saldo)}</b></td>
       <td class="barcell">${used==null?'<span class="muted">—</span>':`<div class="minirow"><div class="mini" title="${PCT(used)} do orçamento consumido${c.elapsed!=null?` · ${PCT(c.elapsed)} do prazo decorrido`:""}"><b class="${used>1?"over":""}" style="width:${Math.min(100,used*100)}%"></b>${c.elapsed!=null?`<i style="left:calc(${c.elapsed*100}% - 1px)"></i>`:""}</div><span>${N0.format(used*100)}%</span></div>`}</td>
@@ -593,13 +620,14 @@ function setView(v){
 }
 function kpi(label,value,sub,cls=""){ return `<div class="card kpi c3 ${cls}"><span class="eyebrow">${label}</span><span class="v">${value}</span>${sub?`<span class="s">${sub}</span>`:""}</div>`; }
 function renderDetail(){
-  const c=compute(state.sel); const st=statusOf(c);
+  const c=fyView(state.sel), F=c.F; const st=statusOf(c);
+  const fyT = state.fy==="all" ? "" : " · "+fyLabel(+state.fy);
   $("pStatus").innerHTML=`<span class="st ${st.cls}"><i></i>${esc(st.short)}</span>`;
   $("kpis").innerHTML =
-    kpi("Receita reconhecida", c.s.real==null? "—" : money(c.receita), `${N0.format(c.hours)} horas`) +
+    kpi("Receita reconhecida"+fyT, c.s.real==null? "—" : money(F.receita), `${N0.format(F.hours)} horas`) +
     kpi("Saldo líquido", money(c.saldo), c.valor==null? "" : `de ${money(c.valor)}`, (c.saldo!=null&&c.saldo<0?"neg ":"")+"key") +
     kpi("Disponível por mês", c.saldoMes==null? "—" : money(c.saldoMes), c.s.prazo? `até ${monthLabel(c.s.prazo)}` : "") +
-    kpi("Despesas", money(c.desp), "");
+    kpi("Despesas"+fyT, money(F.desp), "");
   if(c.valor!=null && c.valor>0){
     const used=c.consumo/c.valor;
     $("burn").innerHTML = `
@@ -618,8 +646,8 @@ function renderDetail(){
     $("burn").innerHTML = `<div class="notice">Informe o valor líquido do projeto.</div>`;
   }
   const ds=c.ds; const imp=ds.importedAt? new Date(ds.importedAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"}) : "—";
-  $("source").textContent = `Fonte: ${ds.fileName||"planilha"}, importada em ${imp} · lançamentos de ${fmtDate(c.minD)} a ${fmtDate(c.maxD)} · Receita = charge-out × horas × realização · valores líquidos de impostos · ritmo = últimas 4 semanas`;
-  renderChart(c); renderPlan(c); renderPeople(c); renderExpenses(c);
+  $("source").textContent = `Fonte: ${ds.fileName||"planilha"}, importada em ${imp} · lançamentos de ${fmtDate(c.minD)} a ${fmtDate(c.maxD)} · Receita = charge-out × horas × realização · valores líquidos de impostos · ritmo = últimas 4 semanas${state.fy==="all"?"":` · filtro ${fyLabel(+state.fy)} (out/${String(state.fy-1).slice(2)} a set/${String(state.fy).slice(2)}) em receita, horas, profissionais, despesas e gráfico; saldo e plano consideram o projeto inteiro`}`;
+  renderChart(c); renderPlan(c); renderPeople(F); renderExpenses(F);
   setView(state.pview||"geral");
 }
 
@@ -760,7 +788,8 @@ function onPlanInput(e){
 function renderChart(c){
   const startM = c.minD? c.minD.slice(0,7) : c.curM;
   const lastM = c.s.prazo && c.s.prazo>c.curM ? c.s.prazo : (c.maxD? c.maxD.slice(0,7) : c.curM);
-  const months = monthsBetween(startM, lastM>c.curM? lastM : c.curM);
+  let months = monthsBetween(startM, lastM>c.curM? lastM : c.curM);
+  if(state.fy!=="all" && state.fy){ const R=fyRange(+state.fy); months=months.filter(k=>k>=R.mStart && k<=R.mEnd); if(!months.length) months=[R.mStart]; }
   const allow = c.saldoMes!=null && c.saldoMes>0 ? c.saldoMes : 0;
   const data = months.map(k=>{
     const act=(c.byMonth[k]||0)*c.real;
@@ -991,9 +1020,11 @@ $("rmBox").addEventListener("click",e=>{
 document.querySelector(".vtabs").addEventListener("click",e=>{ const b=e.target.closest("button[data-v]"); if(b) setView(b.dataset.v); });
 $("inRes").addEventListener("input",e=>{ const v=parseBR(e.target.value); upd({reserva: v==null?5:v}); });
 $("plan").addEventListener("change",onPlanInput);
+$("fySeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-fy]"); if(!b) return; state.fy=b.dataset.fy==="all"?"all":+b.dataset.fy; state.expMonth="all"; try{ localStorage.setItem(LS_KEY+":fy", String(state.fy)); }catch(err){} renderAll(); });
+try{ const f=localStorage.getItem(LS_KEY+":fy"); if(f) state.fy = f==="all"?"all":+f; }catch(e){}
 try{ const v=localStorage.getItem(LS_KEY+":view"); if(v) state.pview=v; }catch(e){}
-$("expSide").addEventListener("click",e=>{ const b=e.target.closest(".mchip"); if(!b) return; state.expMonth=b.dataset.m; renderExpenses(compute(state.sel)); });
-for(const [id,v] of [["vRes","res"],["vHrs","hrs"],["vRec","rec"]]) $(id).addEventListener("click",()=>{ state.view=v; renderPeople(compute(state.sel)); });
+$("expSide").addEventListener("click",e=>{ const b=e.target.closest(".mchip"); if(!b) return; state.expMonth=b.dataset.m; renderExpenses(fyView(state.sel).F); });
+for(const [id,v] of [["vRes","res"],["vHrs","hrs"],["vRec","rec"]]) $(id).addEventListener("click",()=>{ state.view=v; renderPeople(fyView(state.sel).F); });
 /* tela cheia */
 const fsEl=()=>document.fullscreenElement||document.webkitFullscreenElement;
 if(document.fullscreenEnabled||document.webkitFullscreenEnabled){
