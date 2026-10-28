@@ -219,6 +219,7 @@ table.plan td,table.plan th{padding:7px 8px}
 tr.off td{color:var(--muted)} tr.off .who{text-decoration:line-through}
 td.full{font-weight:700;color:var(--accent)}
 .warnc{color:var(--warn)}
+tr.recrow td{font-weight:600;color:var(--accent);border-bottom:0}
 .reshint{font-size:.76rem;color:var(--muted);align-self:center;max-width:260px}
 .reshint b{color:var(--warn)}
 
@@ -771,12 +772,12 @@ function renderPlan(c){
       <td class="n"><input class="cin" data-k="ded" type="number" min="0" max="100" step="5" value="${x.ded}" aria-label="Dedicação ao projeto de ${nm(x.p.p)}">%</td>
       <td class="n"><input type="checkbox" data-k="ativo" ${x.cfg.ativo?"checked":""} aria-label="${nm(x.p.p)} debita horas"></td>
       ${x.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""} ${full[i]?"full":""}" title="Capacidade ${N0.format(x.cap[i])} h">${h(v)}</td>`).join("")}
-      <td class="n"><b>${h(x.hrs.reduce((a,b)=>a+b,0))}</b></td></tr>`;
+      <td class="n"><b>${h(x.hrs.reduce((a,b)=>a+b,0))}</b></td><td class="n">${money(x.hrs.reduce((a,b)=>a+b,0)*x.cost)}</td></tr>`;
   };
-  $("plan").innerHTML = `<table class="plan"><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">h/dia</th><th class="n">Máx. jornada</th><th class="n">Neste projeto</th><th class="n">Debita</th>${P.months.map((k,i)=>`<th class="n ${i===0?"cur":""}">${monthLabel(k)}<br><span class="bdays">${P.bd[i]} dias úteis</span></th>`).join("")}<th class="n">Total h</th></tr></thead><tbody>
-    ${glist.map(G=>`<tr class="grp"><td colspan="6">${nm(G.k==="consult"?"Consultores e especialistas · prioridade":G.nm)}</td>${G.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(G.hrs.reduce((a,b)=>a+b,0))}</td></tr>`+G.rows.map(row).join("")).join("")}
-    <tr class="tot"><td colspan="6">Total de horas</td>${colTot.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(totH)}</td></tr>
-    <tr><td colspan="6" class="muted">Receita planejada</td>${colRec.map((v,i)=>`<td class="n muted ${i===0?"cur":""}">${compact(v)}</td>`).join("")}<td class="n muted">${compact(planned)}</td></tr>
+  $("plan").innerHTML = `<table class="plan"><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">h/dia</th><th class="n">Máx. jornada</th><th class="n">Neste projeto</th><th class="n">Debita</th>${P.months.map((k,i)=>`<th class="n ${i===0?"cur":""}">${monthLabel(k)}<br><span class="bdays">${P.bd[i]} dias úteis</span></th>`).join("")}<th class="n">Total h</th><th class="n">Receita</th></tr></thead><tbody>
+    ${glist.map(G=>`<tr class="grp"><td colspan="6">${nm(G.k==="consult"?"Consultores e especialistas · prioridade":G.nm)}</td>${G.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(G.hrs.reduce((a,b)=>a+b,0))}</td><td class="n">${money(G.rows.reduce((a,x)=>a+x.hrs.reduce((s2,v)=>s2+v,0)*x.cost,0))}</td></tr>`+G.rows.map(row).join("")).join("")}
+    <tr class="tot"><td colspan="6">Total de horas</td>${colTot.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(totH)}</td><td class="n">${money(planned)}</td></tr>
+    <tr class="recrow"><td colspan="6">Receita planejada no mês</td>${colRec.map((v,i)=>`<td class="n ${i===0?"cur":""}">${money(v)}</td>`).join("")}<td></td><td class="n"><b>${money(planned)}</b></td></tr>
   </tbody></table>
   <p class="source" style="margin-top:10px">${sobra>1?`<b class="warnc">Mesmo com todos na capacidade máxima, sobram ${money(sobra)} além da reserva.</b> `:""}Juniores com capacidade cheia primeiro (menor taxa antes); o que faltar para chegar na reserva vai para gerentes e, depois, sócios. ${monthLabel(c.curM)} conta a partir de hoje. Células destacadas = capacidade cheia. BOT fora do plano.</p>`;
 }
