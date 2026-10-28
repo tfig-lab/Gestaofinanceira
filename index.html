@@ -715,21 +715,22 @@ function planOf(c){
   });
   const juniors=people.filter(x=>x.junior && x.cfg.ativo).sort((a,b)=>a.rate-b.rate || a.p.p.localeCompare(b.p.p));
   const seniors=people.filter(x=>!x.junior && x.cfg.ativo);
-  const left=months.map(()=>0);
-  months.forEach((k,i)=>{
-    let R=budget[i];
-    // 1) enche a capacidade dos mais juniores primeiro (menor taxa antes)
-    for(const x of juniors){ if(R<=0||x.cost<=0) break; const h=Math.min(x.cap[i], R/x.cost); x.hrs[i]=h; R-=h*x.cost; }
-    // 2) o que sobrar vai para gerentes e sócios, pelo peso no valor a tabela recente, respeitando a capacidade
-    let pool=seniors.filter(x=>x.cost>0 && x.cap[i]>0);
-    while(R>0.5 && pool.length){
-      const W=pool.reduce((a,x)=>a+(x.w||1),0); let used=0; const next=[];
-      for(const x of pool){ const want=R*(x.w||1)/W; const room=(x.cap[i]-x.hrs[i])*x.cost; const take=Math.min(want,room); x.hrs[i]+=take/x.cost; used+=take; if(room-take>0.5) next.push(x); }
-      R-=used; if(next.length===pool.length && used<0.5) break; pool=next;
-    }
-    left[i]=Math.max(0,R);
-  });
-  return {alvo, reserva, reservaV:c.valor*reserva, months, bd, budget, people, left};
+  // Alvo é o projeto inteiro: consumir tudo até sobrar só a reserva.
+  // 1) juniores com a capacidade cheia em todos os meses (menor taxa primeiro); 2) o que faltar vai para gerentes; 3) depois sócios.
+  let R=Math.max(0,alvo);
+  const fill=list=>{ // preenche um grupo na mesma proporção da capacidade em todos os meses
+    if(R<=0.5) return;
+    const capCost=list.reduce((a,x)=>a+x.cap.reduce((s,h)=>s+h,0)*x.cost,0);
+    if(capCost<=0) return;
+    const f=Math.min(1,R/capCost);
+    for(const x of list) x.hrs=x.cap.map(h=>h*f);
+    R-=capCost*f;
+  };
+  for(const x of juniors){ fill([x]); }
+  fill(seniors.filter(x=>x.g.k==="gerentes"));
+  fill(seniors.filter(x=>x.g.k!=="gerentes"));
+  const left=months.map(()=>0); left[0]=Math.max(0,R);
+  return {alvo, reserva, reservaV:c.valor*reserva, months, bd, budget, people, left, sobra:Math.max(0,R)};
 }
 function renderPlan(c){
   const P=planOf(c);
@@ -742,7 +743,7 @@ function renderPlan(c){
     <div><span>A consumir até o fim</span><b class="${P.alvo<0?"neg":""}">${money(P.alvo)}</b></div>
     <div><span>Reserva final (${N1.format(P.reserva*100)}%)</span><b>${money(P.reservaV)}</b></div>
     <div><span>Horas planejadas</span><b>${N0.format(totH)} h</b></div>
-    <div><span>Sem capacidade para alocar</span><b class="${sobra>1?"warnc":""}">${money(sobra)}</b></div>`;
+    <div><span>Saldo final previsto</span><b class="${sobra>1?"warnc":""}">${money(P.reservaV+sobra)} <span class="muted" style="font-size:.85rem;text-transform:none;letter-spacing:0;font-weight:500">· ${c.valor>0?N1.format((P.reservaV+sobra)/c.valor*100):"—"}%</span></b></div>`;
   if(P.alvo<=0){ $("plan").innerHTML=`<div class="notice err">O saldo já está abaixo da reserva de ${N1.format(P.reserva*100)}%. Não há horas a planejar sem consumir a reserva.</div>`; return; }
   const groups={};
   for(const x of rows){ const G=groups[x.g.k]||(groups[x.g.k]={...x.g,rows:[],hrs:P.months.map(()=>0)}); G.rows.push(x); x.hrs.forEach((h,i)=>G.hrs[i]+=h); }
@@ -768,9 +769,9 @@ function renderPlan(c){
   $("plan").innerHTML = `<table class="plan"><thead><tr><th>Profissional</th><th class="n">Charge-out</th><th class="n">h/dia</th><th class="n">Máx. jornada</th><th class="n">Neste projeto</th><th class="n">Debita</th>${P.months.map((k,i)=>`<th class="n ${i===0?"cur":""}">${monthLabel(k)}<br><span class="bdays">${P.bd[i]} dias úteis</span></th>`).join("")}<th class="n">Total h</th></tr></thead><tbody>
     ${glist.map(G=>`<tr class="grp"><td colspan="6">${nm(G.k==="consult"?"Consultores e especialistas · prioridade":G.nm)}</td>${G.hrs.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(G.hrs.reduce((a,b)=>a+b,0))}</td></tr>`+G.rows.map(row).join("")).join("")}
     <tr class="tot"><td colspan="6">Total de horas</td>${colTot.map((v,i)=>`<td class="n ${i===0?"cur":""}">${h(v)}</td>`).join("")}<td class="n">${h(totH)}</td></tr>
-    <tr><td colspan="6" class="muted">Receita planejada · orçamento do mês</td>${colRec.map((v,i)=>`<td class="n muted ${i===0?"cur":""}">${compact(v)} / ${compact(P.budget[i])}</td>`).join("")}<td class="n muted">${compact(planned)}</td></tr>
+    <tr><td colspan="6" class="muted">Receita planejada</td>${colRec.map((v,i)=>`<td class="n muted ${i===0?"cur":""}">${compact(v)}</td>`).join("")}<td class="n muted">${compact(planned)}</td></tr>
   </tbody></table>
-  <p class="source" style="margin-top:10px">O orçamento de cada mês é proporcional aos dias úteis (${monthLabel(c.curM)} a partir de hoje). Os mais juniores enchem a capacidade primeiro, a partir da menor taxa; o restante vai para gerentes e sócios. Células destacadas = capacidade cheia. BOT fora do plano.</p>`;
+  <p class="source" style="margin-top:10px">${sobra>1?`<b class="warnc">Mesmo com todos na capacidade máxima, sobram ${money(sobra)} além da reserva.</b> `:""}Juniores com capacidade cheia primeiro (menor taxa antes); o que faltar para chegar na reserva vai para gerentes e, depois, sócios. ${monthLabel(c.curM)} conta a partir de hoje. Células destacadas = capacidade cheia. BOT fora do plano.</p>`;
 }
 function savePeople(){
   lsSave();
