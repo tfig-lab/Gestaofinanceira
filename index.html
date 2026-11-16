@@ -252,6 +252,10 @@ table.imc tr.fgrp td.fsub{font-size:.8rem}
 .fadd{margin:4px 0}
 .fadd select{font-size:.78rem;padding:3px 6px}
 #imcNewFront{white-space:nowrap}
+.rwho{display:flex;align-items:center;gap:4px}
+.rsel{border:0;border-bottom:1px dashed transparent;background:transparent;font:inherit;font-weight:600;color:var(--ink);padding:1px 16px 1px 0;cursor:pointer;max-width:160px;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 7px) 55%,calc(100% - 3px) 55%;background-size:4px 4px;background-repeat:no-repeat}
+.rsel:hover,.rsel:focus{border-bottom-color:var(--accent);outline:none}
+.rsel option{color:#0B1F33}
 .selbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;border:1px solid var(--accent);border-radius:4px;background:var(--soft);position:sticky;left:0}
 #imcSelMode[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
 
@@ -1695,7 +1699,8 @@ function render(){
   const roleRow=row=>{
     const id=row.id, R=ROLE[row.role];
     VROWS.push(id);
-    return `<tr data-row="${id}" class="rrow"><td class="stk"><div class="who">${esc(rowLabel(row))}</div>
+    const same=S.rows.filter(r=>r.role===row.role && r.front===row.front); const num=same.length>1?` ${same.indexOf(row)+1}`:"";
+    return `<tr data-row="${id}" class="rrow"><td class="stk"><div class="who rwho"><select class="rsel" data-role="${id}" title="Trocar o cargo desta linha" aria-label="Cargo de ${esc(rowLabel(row))}">${ROLES.map(([rid,nm])=>`<option value="${rid}" ${rid===row.role?"selected":""}>${esc(nm)}</option>`).join("")}</select>${num?`<span>${num}</span>`:""}</div>
         <input class="nmin" data-name="${id}" type="text" value="${esc(row.name||"")}" placeholder="nome (opcional)" aria-label="Nome para ${esc(rowLabel(row))}">
         <div class="lvl">R$ ${NF(0).format(R.sc)}/h base</div>
         <div class="rowacts"><button class="btn link" data-rep="${id}" type="button" title="Preenche os vazios com o último % à esquerda">Repetir →</button><button class="btn link" data-add="${row.role}" data-front="${row.front}" data-after="${id}" type="button" title="Adicionar outra pessoa com este cargo nesta frente">+ outro</button><button class="btn link danger" data-del="${id}" type="button" title="Remover esta linha">remover</button></div></td>
@@ -1909,6 +1914,7 @@ function bind(){
   });
   tbl.addEventListener("change",e=>{
     if(e.target.closest("input.pin")){ if(COLS[+e.target.dataset.i].t==="y") render(); return; }
+    const rs=e.target.closest("select[data-role]"); if(rs){ const row=S.rows.find(r=>r.id===rs.dataset.role); if(row){ const from=ROLE[row.role].nm; row.role=rs.value; sortRows(); save(); render(); msg(`${from} trocado por ${ROLE[row.role].nm}; os % foram mantidos e o valor usa o novo scale.`); } return; }
     const fa=e.target.closest("select[data-fadd]"); if(fa){ const role=fa.value; if(!role) return; const front=fa.dataset.fadd; const id=uid(role);
       const fr=frontRows(front); const lastIdx = fr.length ? S.rows.indexOf(fr[fr.length-1]) : S.rows.length-1;
       S.rows.splice(lastIdx+1,0,{id,role,front,name:""}); S.sel[id]=true; const f=S.fronts.find(x=>x.id===front); if(f) f.coll=false; sortRows(); save(); render();
