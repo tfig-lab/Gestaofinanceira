@@ -212,6 +212,36 @@ details[open] summary{margin-bottom:10px}
 tr.curm td{background:var(--soft)}
 .inp select{border:0;background:transparent;padding:6px 8px;width:100%;font-size:.9rem;outline:none;color:var(--ink)}
 
+/* IMC */
+#imcRoot{display:block}
+.imc-sum{position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.imc-sum .pstrip{background:var(--card);box-shadow:var(--shadow)}
+.imc-sum .pstrip > div{justify-content:flex-start}
+.imc-sum .hero{background:var(--accent);color:var(--on-accent)}
+.imc-sum .hero span{color:inherit;opacity:.85}
+.imc-sum .hero b{font-size:1.6rem}
+.imc-actions{display:inline-flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.imc-scroll{max-height:none}
+table.imc{border-collapse:separate;border-spacing:0}
+table.imc th,table.imc td{padding:7px 8px}
+table.imc .stk{position:sticky;left:0;z-index:2;background:var(--card);min-width:170px;box-shadow:1px 0 0 var(--line)}
+table.imc thead .stk{z-index:3}
+table.imc tr.tot .stk{background:var(--card)}
+table.imc th.imadj,table.imc td.imadj{background:var(--soft)}
+#imcDash .assume .field{width:128px}
+#imcDash .assume .field.f-prazo{width:165px}
+.adjc{display:inline-block;margin-top:2px;font-size:.66rem;font-weight:700;color:var(--accent);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 6px;letter-spacing:0;text-transform:none}
+table.imc td.cell{min-width:78px;white-space:nowrap}
+.pin{width:52px;border:1px solid var(--line);background:var(--page);border-radius:3px;padding:4px 5px;text-align:right;font-size:.88rem}
+.pin:focus{outline:none;border-color:var(--accent)}
+.pct{font-size:.75rem;color:var(--muted);margin-left:2px}
+.hh{font-size:.72rem;color:var(--muted);min-height:1em;margin-top:2px}
+table.imc tr.imoff .pin{opacity:.55}
+table.imc tr.imoff .who{color:var(--muted)}
+table.imc .rep{font-size:.74rem;margin-top:2px}
+table.imc tr.tot .mv{font-size:.74rem;font-weight:600;color:var(--accent)}
+@media (max-width:600px){table.imc .stk{min-width:130px;max-width:150px}.imc-sum .pstrip > div{padding:8px 10px}.imc-sum .pstrip span{font-size:.62rem}.imc-sum .pstrip b,.imc-sum .hero b{font-size:1.05rem}}
+
 /* abas do projeto */
 .vtabs{display:flex;gap:4px;border-top:1px solid var(--line);margin:4px -18px -16px;padding:0 12px;overflow-x:auto}
 .vtabs button{border:0;background:none;padding:12px 12px 10px;font-size:.88rem;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
@@ -284,7 +314,9 @@ td.vs{font-size:.78rem;color:var(--muted)}
   <nav class="mainnav" id="mainnav" role="tablist" aria-label="Áreas do painel" hidden>
     <button role="tab" data-mv="proj" aria-selected="true">Projetos</button>
     <button role="tab" data-mv="bsc" aria-selected="false">Minhas metas (BSC)</button>
+    <button role="tab" data-mv="imc" aria-selected="false">IMC (orçamento)</button>
   </nav>
+  <div id="imcRoot" hidden></div>
 
   <div class="dash" id="dash" hidden>
     <section class="card c12" aria-label="Carteira">
@@ -631,11 +663,13 @@ const MESL=["janeiro","fevereiro","março","abril","maio","junho","julho","agost
 const mesAno = k => { if(!k) return "—"; const [y,m]=k.split("-"); return `${MESL[+m-1]} de ${y}`; };
 function renderAll(){
   const engs=Object.keys(state.datasets).sort((a,b)=>(state.datasets[a].desc||"").localeCompare(state.datasets[b].desc||""));
-  $("empty").hidden = engs.length>0;
-  $("dash").hidden = engs.length===0 || state.mainView==="bsc";
-  $("mainnav").hidden = engs.length===0;
+  $("empty").hidden = engs.length>0 || state.mainView==="imc";
+  $("dash").hidden = engs.length===0 || state.mainView!=="proj";
+  $("mainnav").hidden = false;
   $("bsc").hidden = engs.length===0 || state.mainView!=="bsc";
-  $("fySeg").style.visibility = state.mainView==="bsc" ? "hidden" : "visible";
+  $("imcRoot").hidden = state.mainView!=="imc";
+  for(const b of $("mainnav").querySelectorAll("button")) b.setAttribute("aria-selected", String(b.dataset.mv===state.mainView));
+  $("fySeg").style.visibility = state.mainView==="proj" ? "visible" : "hidden";
   $("asof").textContent = `Posição de ${new Date().toLocaleDateString("pt-BR")}`;
   if(!engs.length){ $("tabs").innerHTML=""; return; }
   if(!state.sel || !state.datasets[state.sel]) state.sel=engs[0];
@@ -1153,7 +1187,7 @@ $("bscIni").addEventListener("change",e=>{ if(e.target.value) saveBsc({ini:e.tar
 $("bscFim").addEventListener("change",e=>{ if(e.target.value) saveBsc({fim:e.target.value}); });
 $("bscChg").addEventListener("change",e=>{ const v=parseBR(e.target.value); if(v!=null) saveBsc({chg:Math.max(0,Math.min(100,v))}); else renderBsc(); });
 $("bscProj").addEventListener("change",e=>{ const el=e.target.closest("input[data-bp]"); if(!el) return; const B=bscCfg(); saveBsc({proj:{...B.proj,[el.dataset.bp]:el.checked}}); });
-try{ const mv=localStorage.getItem(LS_KEY+":main"); if(mv==="bsc") state.mainView="bsc"; }catch(e){}
+try{ const mv=localStorage.getItem(LS_KEY+":main"); if(mv==="bsc"||mv==="imc") state.mainView=mv; }catch(e){}
 $("plan").addEventListener("change",onPlanInput);
 $("planReset").addEventListener("click",resetPlan);
 $("fySeg").addEventListener("click",e=>{ const b=e.target.closest("button[data-fy]"); if(!b) return; state.fy=b.dataset.fy==="all"?"all":+b.dataset.fy; state.expMonth="all"; try{ localStorage.setItem(LS_KEY+":fy", String(state.fy)); }catch(err){} renderAll(); });
@@ -1202,7 +1236,10 @@ function setMainView(v){
   const has=Object.keys(state.datasets).length>0;
   $("dash").hidden = !(has && v==="proj");
   $("bsc").hidden = !(has && v==="bsc");
-  $("fySeg").style.visibility = v==="bsc" ? "hidden" : "visible";
+  $("imcRoot").hidden = v!=="imc";
+  $("empty").hidden = has || v==="imc";
+  $("fySeg").style.visibility = v==="proj" ? "visible" : "hidden";
+  if(v==="imc" && window.IMC) window.IMC.render();
   try{ localStorage.setItem(LS_KEY+":main", v); }catch(e){}
   if(v==="bsc") renderBsc(); else if(state.sel&&state.datasets[state.sel]) renderChart(compute(state.sel));
 }
@@ -1330,7 +1367,7 @@ function snapshotData(){
 function buildSnapshotHtml(){
   const doc=new DOMParser().parseFromString(BOOT_HTML,"text/html");
   // mantém só os scripts do próprio painel (leitor de Excel e código do app)
-  for(const sc of [...doc.querySelectorAll("script")]){ const src=sc.getAttribute("src")||""; if(!(sc.id==="app-js" || /cdnjs\.cloudflare\.com\/ajax\/libs\/xlsx\//.test(src))) sc.remove(); }
+  for(const sc of [...doc.querySelectorAll("script")]){ const src=sc.getAttribute("src")||""; if(!(sc.id==="app-js" || sc.id==="imc-js" || /cdnjs\.cloudflare\.com\/ajax\/libs\/xlsx\//.test(src))) sc.remove(); }
   doc.querySelectorAll("#painel-snapshot").forEach(n=>n.remove());
   const data=doc.createElement("script"); data.type="application/json"; data.id="painel-snapshot";
   data.textContent=JSON.stringify(snapshotData()).replace(/</g,"\\u003c");
@@ -1403,5 +1440,204 @@ initDb();
 window.__painel = {state, extract, parseSpreadsheetML, compute, handleFile};
 })();
 </script>
+<script id="imc-js">
+/* ---------- IMC: orçamento de projeto Advisory/CMG (autocontido, também roda na versão baixada) ---------- */
+(() => {
+"use strict";
+const ROOT = document.getElementById("imcRoot"); if(!ROOT) return;
+const ROLES = [
+  ["socio","Sócio",5320],["diretor","Diretor",4930],["gs","Gerente Sênior",3880],["gerente","Gerente",2880],
+  ["esps","Especialista Sênior",3340],["esp","Especialista",2220],["cs","Consultor Sênior",1800],["cp","Consultor Pleno",1230],
+  ["cj","Consultor Júnior",910],["trainee","Trainee",660],["estag","Estagiário",610]
+];
+const KEY="painel-imc-v1";
+const MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const BRL=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2});
+const NF=(d)=>new Intl.NumberFormat("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:d});
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pad=n=>String(n).padStart(2,"0");
+function parseNum(v){
+  if(v==null) return null; let s=String(v).trim().replace(/[R$%\s]/g,""); if(!s) return null;
+  if(s.includes(",")) s=s.replace(/\./g,"").replace(",","."); else if((s.match(/\./g)||[]).length>1) s=s.replace(/\./g,"");
+  const n=parseFloat(s); return isFinite(n)?n:null;
+}
+function nextMonthKey(){ const d=new Date(); d.setMonth(d.getMonth()+1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
+const DEF={ini:nextMonthKey(), n:7, real:100, hm:168, reaj:6, sel:{}, alloc:{}, onlySel:false};
+let S;
+function load(){
+  let v=null; try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
+  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})};
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function months(){ const out=[]; let [y,m]=S.ini.split("-").map(Number); for(let i=0;i<S.n;i++){ out.push({k:`${y}-${pad(m)}`,y,m}); m++; if(m>12){m=1;y++;} } return out; }
+// ciclos de reajuste: base abr/2026, reajuste todo abril
+const cycles=(y,m)=>Math.max(0,(y-2026)-(m<4?1:0));
+const factor=(y,m)=>Math.pow(1+S.reaj/100, cycles(y,m));
+const label=(o)=>`${MES[o.m-1]}/${String(o.y).slice(2)}`;
+const pctOf=(r,k)=>{ const v=(S.alloc[r]||{})[k]; return v==null||v===""?0:(parseNum(v)||0); };
+
+const MARKUP = `
+<div class="dash" id="imcDash">
+  <section class="card c12" aria-label="Parâmetros do orçamento">
+    <div class="proj">
+      <div class="who">
+        <span class="eyebrow">Advisory / CMG · scales base abr/2026</span>
+        <div class="nm"><h2>Orçamento de projeto (IMC)</h2></div>
+      </div>
+      <div class="assume">
+        <div class="field f-prazo"><label for="imcIni">Mês inicial</label><div class="inp"><input id="imcIni" type="month"></div></div>
+        <div class="field f-real"><label for="imcN">Nº de meses</label><div class="inp"><input id="imcN" type="text" inputmode="numeric"></div></div>
+        <div class="field f-real"><label for="imcReal">Realização</label><div class="inp"><input id="imcReal" type="text" inputmode="decimal"><span>%</span></div></div>
+        <div class="field f-real"><label for="imcHm">Horas/mês (100%)</label><div class="inp"><input id="imcHm" type="text" inputmode="decimal"><span>h</span></div></div>
+        <div class="field f-real"><label for="imcReaj">Reajuste anual</label><div class="inp"><input id="imcReaj" type="text" inputmode="decimal"><span>%</span></div></div>
+      </div>
+    </div>
+    <div class="proj-foot"><span>O reajuste vale a partir de cada abril, de forma composta. Células vazias contam como 0%.</span><span class="imc-actions"><label class="check" style="padding:0"><input type="checkbox" id="imcOnly"><span>Mostrar só cargos selecionados</span></label><button class="btn link danger" id="imcClear" type="button">Limpar tabela</button><button class="btn" id="imcCopy" type="button">Copiar resumo</button><button class="btn" id="imcDl" type="button">Baixar esta aba</button></span></div>
+  </section>
+
+  <section class="c12 imc-sum" aria-label="Resumo do orçamento">
+    <div class="pstrip">
+      <div class="hero"><span>Valor líquido do projeto</span><b id="imcLiq">R$ 0,00</b></div>
+      <div><span>Total de horas</span><b id="imcH">0 h</b></div>
+      <div><span>Valor bruto (sem realização)</span><b id="imcBruto">R$ 0,00</b></div>
+      <div><span>Taxa média líquida</span><b id="imcTaxa">—</b></div>
+    </div>
+  </section>
+
+  <section class="card c12" aria-label="Alocação por cargo e mês">
+    <div class="card-hd"><h3>Alocação por cargo e mês</h3><span class="sub" id="imcPeriod"></span></div>
+    <div class="tbl imc-scroll"><table class="imc" id="imcTbl"></table></div>
+  </section>
+  <p class="source c12" id="imcMsg" role="status"></p>
+</div>`;
+
+function render(){
+  const M=months();
+  const root=ROOT;
+  if(!root.querySelector("#imcDash")){ root.innerHTML=MARKUP; bind(); }
+  const ae=document.activeElement;
+  const setv=(id,v)=>{ const el=document.getElementById(id); if(el!==ae) el.value=v; };
+  setv("imcIni",S.ini); setv("imcN",S.n); setv("imcReal",NF(2).format(S.real)); setv("imcHm",NF(2).format(S.hm)); setv("imcReaj",NF(2).format(S.reaj));
+  document.getElementById("imcOnly").checked=!!S.onlySel;
+  document.getElementById("imcPeriod").textContent=`${label(M[0])} a ${label(M[M.length-1])} · ${M.length} ${M.length===1?"mês":"meses"}`;
+  const head=`<thead><tr><th class="stk">Cargo</th><th class="n">No projeto</th>${M.map(o=>{const f=factor(o.y,o.m); return `<th class="n ${f>1?"imadj":""}">${label(o)}${f>1?`<br><span class="adjc">+${NF(2).format((f-1)*100)}%</span>`:""}</th>`;}).join("")}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
+  const body=ROLES.map(([id,nm,sc])=>{
+    const on=!!S.sel[id];
+    if(S.onlySel && !on) return "";
+    return `<tr data-r="${id}" class="${on?"":"imoff"}"><td class="stk"><div class="who">${esc(nm)}</div><div class="lvl">R$ ${NF(0).format(sc)}/h base</div><button class="btn link rep" data-rep="${id}" type="button">Repetir →</button></td>
+      <td class="n"><input type="checkbox" data-sel="${id}" ${on?"checked":""} aria-label="${esc(nm)} entra no projeto"></td>
+      ${M.map(o=>{ const v=(S.alloc[id]||{})[o.k]; return `<td class="n cell ${factor(o.y,o.m)>1?"imadj":""}"><input class="pin" data-r="${id}" data-k="${o.k}" type="text" inputmode="decimal" value="${v==null?"":esc(v)}" placeholder="0" aria-label="${esc(nm)} ${label(o)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${o.k}"></div></td>`; }).join("")}
+      <td class="n" id="th_${id}"></td><td class="n" id="tv_${id}"></td></tr>`;
+  }).join("");
+  const foot=`<tr class="tot"><td class="stk">Total do mês</td><td></td>${M.map(o=>`<td class="n ${factor(o.y,o.m)>1?"imadj":""}"><div id="mh_${o.k}"></div><div class="mv" id="mv_${o.k}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
+  document.getElementById("imcTbl").innerHTML=head+`<tbody>${body}${foot}</tbody>`;
+  recalc();
+}
+function calc(){
+  const M=months(); const R=S.real/100;
+  const rows={}, colH={}, colV={}; let H=0, Vb=0;
+  for(const [id,nm,sc] of ROLES){
+    let rh=0, rv=0; const cells={};
+    for(const o of M){
+      const p = S.sel[id] ? pctOf(id,o.k) : 0;
+      const h=S.hm*(p/100); const vb=h*sc*factor(o.y,o.m);
+      cells[o.k]={h,vb}; rh+=h; rv+=vb; colH[o.k]=(colH[o.k]||0)+h; colV[o.k]=(colV[o.k]||0)+vb*R;
+    }
+    rows[id]={nm,sc,cells,h:rh,vb:rv,vl:rv*R}; H+=rh; Vb+=rv;
+  }
+  return {M,rows,colH,colV,H,Vb,VL:Vb*R};
+}
+function recalc(){
+  const C=calc(); const fh=v=>`${NF(1).format(v)} h`;
+  for(const [id] of ROLES){
+    const r=C.rows[id];
+    for(const o of C.M){ const el=document.getElementById(`h_${id}_${o.k}`); if(el) el.textContent = r.cells[o.k].h>0 ? fh(r.cells[o.k].h) : ""; }
+    const th=document.getElementById(`th_${id}`), tv=document.getElementById(`tv_${id}`);
+    if(th) th.innerHTML = r.h>0 ? `<b>${fh(r.h)}</b>` : `<span class="zero">–</span>`;
+    if(tv) tv.innerHTML = r.vl>0 ? BRL.format(r.vl) : `<span class="zero">–</span>`;
+  }
+  for(const o of C.M){ const a=document.getElementById(`mh_${o.k}`), b=document.getElementById(`mv_${o.k}`); if(a) a.textContent=fh(C.colH[o.k]||0); if(b) b.textContent=BRL.format(C.colV[o.k]||0); }
+  document.getElementById("imcTH").textContent=fh(C.H); document.getElementById("imcTV").textContent=BRL.format(C.VL);
+  document.getElementById("imcLiq").textContent=BRL.format(C.VL);
+  document.getElementById("imcH").textContent=fh(C.H);
+  document.getElementById("imcBruto").textContent=BRL.format(C.Vb);
+  document.getElementById("imcTaxa").textContent= C.H>0 ? `${BRL.format(C.VL/C.H)}/h` : "—";
+  return C;
+}
+function summaryText(){
+  const C=calc(); const M=C.M;
+  const L=[`Orçamento Advisory/CMG — ${label(M[0])} a ${label(M[M.length-1])} (${M.length} ${M.length===1?"mês":"meses"})`,
+    `Realização ${NF(2).format(S.real)}% · ${NF(2).format(S.hm)} h/mês a 100% · reajuste ${NF(2).format(S.reaj)}% a.a. em abril (scales base abr/2026)`, ""];
+  for(const [id] of ROLES){ const r=C.rows[id]; if(r.h>0) L.push(`${r.nm} (R$ ${NF(0).format(r.sc)}/h base): ${NF(1).format(r.h)} h · ${BRL.format(r.vl)}`); }
+  L.push("", `Total: ${NF(1).format(C.H)} h`, `Valor bruto: ${BRL.format(C.Vb)}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
+  return L.join("\n");
+}
+function msg(t){ const m=document.getElementById("imcMsg"); m.textContent=t; clearTimeout(msg.t); msg.t=setTimeout(()=>{m.textContent="";},6000); }
+async function copySummary(){
+  const t=summaryText();
+  try{ await navigator.clipboard.writeText(t); msg("Resumo copiado."); return; }catch(e){}
+  const ta=document.createElement("textarea"); ta.value=t; ta.style.cssText="width:100%;min-height:180px;margin-top:8px";
+  const m=document.getElementById("imcMsg"); m.textContent="Não foi possível copiar automaticamente. Selecione o texto abaixo e copie:"; m.appendChild(ta); ta.focus(); ta.select();
+}
+function standaloneHtml(){
+  const style=[...document.querySelectorAll("style")].find(s=>s.textContent.includes("--accent"));
+  const src=document.getElementById("imc-js").textContent;
+  return `<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Orçamento de Projeto IMC</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<style>${style?style.textContent:""}</style><style>html,body{margin:0}</style></head>
+<body><div class="wrap"><header class="top"><div class="id"><h1>Orçamento de Projeto</h1><span class="eyebrow">Advisory / CMG · salvo em ${new Date().toLocaleDateString("pt-BR")}</span></div></header>
+<div id="imcRoot"></div></div>
+<script>window.IMC_STATE=${JSON.stringify(S).replace(/</g,"\\u003c")};<\/script>
+<script id="imc-js">${src}<\/script>
+</body></html>`;
+}
+async function download(){
+  const html=standaloneHtml(); const fname=`orcamento-imc-${S.ini}.html`;
+  let dl=null; try{ dl = window.claude && window.claude.use ? await window.claude.use("downloads") : null; }catch(e){ dl=null; }
+  if(dl){ try{ await dl.save({filename:fname, data:html}); msg(`${fname} salvo.`); }catch(e){ if(!e||e.code!=="declined") msg("Não foi possível salvar o arquivo nesta visualização."); } return; }
+  try{ const url=URL.createObjectURL(new Blob([html],{type:"text/html"})); const a=document.createElement("a"); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),3000); msg(`${fname} baixado. Abra o arquivo para usar só a calculadora.`); }
+  catch(e){ msg("O navegador bloqueou o download."); }
+}
+function bind(){
+  const g=id=>document.getElementById(id);
+  g("imcIni").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ S.ini=e.target.value; save(); render(); } });
+  g("imcN").addEventListener("change",e=>{ const v=parseNum(e.target.value); if(v!=null){ S.n=Math.max(1,Math.min(36,Math.round(v))); } save(); render(); });
+  for(const [id,k] of [["imcReal","real"],["imcHm","hm"],["imcReaj","reaj"]]){
+    g(id).addEventListener("input",e=>{ const v=parseNum(e.target.value); if(v!=null && v>=0){ S[k]=v; save(); if(k==="reaj") return; recalc(); } });
+    g(id).addEventListener("change",()=>render());
+  }
+  g("imcOnly").addEventListener("change",e=>{ S.onlySel=e.target.checked; save(); render(); });
+  g("imcClear").addEventListener("click",e=>{
+    const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.sel={}; save(); render(); msg("Tabela limpa."); return; }
+    b.dataset.confirm="1"; b.textContent="Confirmar limpeza"; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.confirm; b.textContent="Limpar tabela"; } },4000);
+  });
+  g("imcCopy").addEventListener("click",copySummary);
+  g("imcDl").addEventListener("click",download);
+  const tbl=g("imcTbl");
+  tbl.addEventListener("input",e=>{
+    const el=e.target.closest("input.pin"); if(!el) return;
+    const r=el.dataset.r, k=el.dataset.k, raw=el.value.trim();
+    S.alloc[r]={...(S.alloc[r]||{})}; if(raw==="") delete S.alloc[r][k]; else S.alloc[r][k]=raw;
+    if(raw!=="" && !S.sel[r]){ S.sel[r]=true; const cb=tbl.querySelector(`input[data-sel="${r}"]`); if(cb) cb.checked=true; el.closest("tr").classList.remove("imoff"); }
+    save(); recalc();
+  });
+  tbl.addEventListener("change",e=>{
+    const cb=e.target.closest("input[data-sel]"); if(!cb) return;
+    S.sel[cb.dataset.sel]=cb.checked; save(); render();
+  });
+  tbl.addEventListener("click",e=>{
+    const b=e.target.closest("button[data-rep]"); if(!b) return;
+    const r=b.dataset.rep, M=months(); const first=M.map(o=>(S.alloc[r]||{})[o.k]).find(v=>v!=null && String(v).trim()!=="");
+    if(first==null){ msg("Preencha o % de pelo menos um mês desse cargo antes de repetir."); return; }
+    S.alloc[r]={...(S.alloc[r]||{})}; for(const o of M) S.alloc[r][o.k]=first; S.sel[r]=true; save(); render();
+  });
+}
+load(); render();
+window.IMC={render, recalc, calc, summaryText, _state:()=>S};
+})();
+</script>
+
 </body>
 </html>
