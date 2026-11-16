@@ -1507,7 +1507,7 @@ let S;
 function load(){
   let v=null; try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
   S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})}; S.coll={...(S.coll||{})};
-  if(S.view==="ano"){ S.view="mes"; S.allYears=true; }
+  if(S.view==="ano"){ S.view="mes"; S.yearMode=true; S.coll={}; }
   if(!Array.isArray(S.rows) || !S.rows.length) S.rows=ROLES.map(([id])=>({id, role:id, name:""}));
   S.rows=S.rows.filter(r=>ROLE[r.role]);
   if(!Array.isArray(S.fronts) || !S.fronts.length){
@@ -1540,7 +1540,8 @@ const hoursMonth=o=> S.base==="fixo" ? S.hm : o.bd*S.hd;
 const raw=(store,r,k)=>{ const v=(store[r]||{})[k]; return v==null?"":String(v); };
 const pnum=s=> s===""?0:(parseNum(s)||0);
 const yearsOf=M=>[...new Set(M.map(o=>o.y))];
-function isColl(y){ return !!S.coll[y]; }
+// no modo Ano, todo ano começa recolhido (inclusive anos que entram depois); o clique no ano abre/fecha só ele
+function isColl(y){ return (y in S.coll) ? !!S.coll[y] : !!S.yearMode; }
 
 // colunas: semanas, ou meses com anos recolhidos virando uma coluna
 function columns(){
@@ -1656,7 +1657,6 @@ const ck=(r,i)=>`${r}|${i}`;
 function render(){
   if(!ROOT.querySelector("#imcDash")){ ROOT.innerHTML=MARKUP; bind(); }
   const M=months(); const YS=yearsOf(M);
-  if(S.allYears){ for(const y of YS) S.coll[y]=true; delete S.allYears; }
   COLS=columns();
   const ae=document.activeElement, g=id=>document.getElementById(id);
   const setv=(id,v)=>{ const el=g(id); if(el!==ae) el.value=v; };
@@ -1845,7 +1845,7 @@ function bind(){
   }
   g("imcBDu").addEventListener("click",()=>{ S.base="du"; save(); render(); });
   g("imcBFx").addEventListener("click",()=>{ S.base="fixo"; save(); render(); });
-  const setView=(v,collAll)=>{ const was=S.view==="semana"; S.view=v; if(was!==(v==="semana")) seedOnSwitch(v); if(v==="mes"){ for(const y of yearsOf(months())) S.coll[y]=collAll; } SEL.clear(); save(); render(); };
+  const setView=(v,collAll)=>{ const was=S.view==="semana"; S.view=v; if(was!==(v==="semana")) seedOnSwitch(v); if(v==="mes"){ S.yearMode=!!collAll; S.coll={}; } SEL.clear(); save(); render(); };
   g("imcVS").addEventListener("click",()=>setView("semana"));
   g("imcVM").addEventListener("click",()=>setView("mes",false));
   g("imcVA").addEventListener("click",()=>setView("mes",true));
