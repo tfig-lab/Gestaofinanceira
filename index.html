@@ -228,6 +228,23 @@ table.imc .stk{position:sticky;left:0;z-index:2;background:var(--card);min-width
 table.imc thead .stk{z-index:3}
 table.imc tr.tot .stk{background:var(--card)}
 table.imc th.imadj,table.imc td.imadj{background:var(--soft)}
+.imc-sum .pstrip{grid-template-columns:1.3fr repeat(4,minmax(0,1fr))}
+@media (max-width:900px){.imc-sum .pstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.imc-sum .pstrip > div{border-left:0;border-top:1px solid var(--line)}.imc-sum .hero{grid-column:1/-1}}
+table.imc .ygrp{text-align:left;border-bottom:1px solid var(--line);padding:4px 8px}
+.ytog{border:0;background:none;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;padding:2px 4px;font-size:.8rem;letter-spacing:.04em}
+.ytog:hover{color:var(--accent)}
+table.imc th.ycol,table.imc td.ycol{box-shadow:inset 1px 0 0 var(--line)}
+.nmin{display:block;width:100%;max-width:150px;border:0;border-bottom:1px dashed var(--line);background:transparent;font-size:.76rem;padding:1px 0;margin:1px 0 2px;color:var(--ink)}
+.nmin:focus{outline:none;border-bottom-color:var(--accent)}
+.rowacts{display:flex;flex-wrap:wrap;gap:2px 10px;font-size:.74rem}
+.rowacts .btn.link{font-size:.74rem}
+table.imc td.imsel{background:color-mix(in srgb, var(--accent) 16%, var(--card))!important;box-shadow:inset 0 0 0 1px var(--accent)}
+table.imc.dragging,table.imc.dragging *{user-select:none;cursor:cell}
+table.imc.selmode td.cell{cursor:pointer}
+table.imc.selmode .pin{pointer-events:none}
+.selbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;border:1px solid var(--accent);border-radius:4px;background:var(--soft);position:sticky;left:0}
+#imcSelMode[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+
 #imcDash .assume .field{width:128px}
 #imcDash .assume .field.f-prazo{width:165px}
 .adjc{display:inline-block;margin-top:2px;font-size:.66rem;font-weight:700;color:var(--accent);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 6px;letter-spacing:0;text-transform:none}
@@ -1450,6 +1467,7 @@ const ROLES = [
   ["esps","Especialista Sênior",3340],["esp","Especialista",2220],["cs","Consultor Sênior",1800],["cp","Consultor Pleno",1230],
   ["cj","Consultor Júnior",910],["trainee","Trainee",660],["estag","Estagiário",610]
 ];
+const ROLE=Object.fromEntries(ROLES.map(([id,nm,sc])=>[id,{id,nm,sc}]));
 const KEY="painel-imc-v1";
 const MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
 const BRL=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimumFractionDigits:2,maximumFractionDigits:2});
@@ -1470,19 +1488,23 @@ const isBiz=d=>{ const w=d.getDay(); return w!==0 && w!==6 && !hols(d.getFullYea
 function nextMonthKey(){ const d=new Date(); d.setMonth(d.getMonth()+1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
 const addMonths=(k,n)=>{ let [y,m]=k.split("-").map(Number); m+=n; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return `${y}-${pad(m)}`; };
 const diffMonths=(a,b)=>{ const [y1,m1]=a.split("-").map(Number), [y2,m2]=b.split("-").map(Number); return (y2-y1)*12+(m2-m1); };
-const DEF={ini:nextMonthKey(), n:7, real:100, base:"du", hd:8, hm:168, reaj:6, view:"mes", sel:{}, alloc:{}, allocW:{}, onlySel:false};
+const DEF={ini:nextMonthKey(), n:7, real:100, base:"du", hd:8, hm:168, reaj:6, view:"mes", coll:{}, rows:null, sel:{}, alloc:{}, allocW:{}, onlySel:false, selMode:false};
 let S;
 function load(){
   let v=null; try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
-  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})};
-  if(v && !v.base) S.base="du";
+  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})}; S.coll={...(S.coll||{})};
+  if(S.view==="ano"){ S.view="mes"; S.allYears=true; }
+  if(!Array.isArray(S.rows) || !S.rows.length) S.rows=ROLES.map(([id])=>({id, role:id, name:""}));
+  S.rows=S.rows.filter(r=>ROLE[r.role]);
+  for(const [id] of ROLES) if(!S.rows.some(r=>r.role===id)) S.rows.push({id:uid(id), role:id, name:""});
+  sortRows();
 }
+function uid(role){ let i=2; while(S && S.rows && S.rows.some(r=>r.id===`${role}_${i}`)) i++; return `${role}_${i}`; }
+function sortRows(){ const ord=Object.fromEntries(ROLES.map(([id],i)=>[id,i])); S.rows.sort((a,b)=>ord[a.role]-ord[b.role] || (S.rows.indexOf(a)-S.rows.indexOf(b))); }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 const fim=()=>addMonths(S.ini,S.n-1);
-// meses do período
 function months(){ const out=[]; for(let i=0;i<S.n;i++){ const k=addMonths(S.ini,i); const [y,m]=k.split("-").map(Number); out.push({k,y,m,bd:bizDaysMonth(y,m)}); } return out; }
 function bizDaysMonth(y,m){ let n=0; const last=new Date(y,m,0).getDate(); for(let d=1;d<=last;d++) if(isBiz(new Date(y,m-1,d))) n++; return n; }
-// dias úteis do período, com o mês e a semana (segunda-feira) de cada um
 function bizDays(){
   const [y,m]=S.ini.split("-").map(Number); const [y2,m2]=fim().split("-").map(Number);
   const d=new Date(y,m-1,1), end=new Date(y2,m2,0); const out=[];
@@ -1496,53 +1518,59 @@ const mlabel=(y,m)=>`${MES[m-1]}/${String(y).slice(2)}`;
 const hoursMonth=o=> S.base==="fixo" ? S.hm : o.bd*S.hd;
 const raw=(store,r,k)=>{ const v=(store[r]||{})[k]; return v==null?"":String(v); };
 const pnum=s=> s===""?0:(parseNum(s)||0);
+const yearsOf=M=>[...new Set(M.map(o=>o.y))];
+function isColl(y){ return !!S.coll[y]; }
 
-// colunas da visão atual
+// colunas: semanas, ou meses com anos recolhidos virando uma coluna
 function columns(){
   const M=months();
-  if(S.view==="ano"){
-    const by={}; for(const o of M){ (by[o.y]||(by[o.y]={k:String(o.y),y:o.y,months:[]})).months.push(o); }
-    return Object.values(by).map(c=>{ const f0=factor(c.y,c.months[0].m), f1=factor(c.y,c.months[c.months.length-1].m);
-      return {...c, label:String(c.y), sub:`${mlabel(c.y,c.months[0].m)} a ${mlabel(c.y,c.months[c.months.length-1].m)} · ${c.months.length} ${c.months.length===1?"mês":"meses"}`, fmax:Math.max(f0,f1), fmin:Math.min(f0,f1)}; });
-  }
   if(S.view==="semana"){
-    const by={}; for(const d of bizDays()){ (by[d.wk]||(by[d.wk]={k:d.wk,days:[]})).days.push(d); }
-    return Object.values(by).map(c=>{ const [y,m,dd]=c.k.split("-"); const fs=c.days.map(d=>factor(d.y,d.m)); return {...c, label:`${dd}/${m}`, sub:`${c.days.length} ${c.days.length===1?"dia útil":"dias úteis"}`, fmax:Math.max(...fs), fmin:Math.min(...fs)}; });
+    const by={}; for(const d of bizDays()){ (by[d.wk]||(by[d.wk]={t:"w",k:d.wk,days:[]})).days.push(d); }
+    return Object.values(by).map(c=>{ const [y,m,dd]=c.k.split("-"); const fs=c.days.map(d=>factor(d.y,d.m)); return {...c, y:+y, label:`${dd}/${m}`, sub:`${c.days.length} ${c.days.length===1?"dia útil":"dias úteis"}`, fmax:Math.max(...fs), fmin:Math.min(...fs)}; });
   }
-  return M.map(o=>({...o, label:mlabel(o.y,o.m), sub: S.base==="fixo" ? `${NF(1).format(S.hm)} h` : `${o.bd} dias úteis`, fmax:factor(o.y,o.m), fmin:factor(o.y,o.m)}));
+  const out=[];
+  for(const y of yearsOf(M)){
+    const ms=M.filter(o=>o.y===y);
+    if(isColl(y)){ const f0=factor(y,ms[0].m), f1=factor(y,ms[ms.length-1].m);
+      out.push({t:"y", k:"Y"+y, y, months:ms, label:String(y), sub:`${mlabel(y,ms[0].m)} a ${mlabel(y,ms[ms.length-1].m)} · ${ms.length} ${ms.length===1?"mês":"meses"}`, fmax:Math.max(f0,f1), fmin:Math.min(f0,f1)}); }
+    else for(const o of ms) out.push({t:"m", ...o, label:mlabel(o.y,o.m), sub: S.base==="fixo" ? `${NF(1).format(S.hm)} h` : `${o.bd} dias úteis`, fmax:factor(o.y,o.m), fmin:factor(o.y,o.m)});
+  }
+  return out;
 }
-const usesWeekly=()=>S.view==="semana";
 function getCell(r,c){
-  if(S.view==="semana") return {v:raw(S.allocW,r,c.k)};
-  if(S.view==="ano"){ const vals=[...new Set(c.months.map(o=>raw(S.alloc,r,o.k)))]; return vals.length===1 ? {v:vals[0]} : {v:"",mixed:true}; }
+  if(c.t==="w") return {v:raw(S.allocW,r,c.k)};
+  if(c.t==="y"){ const vals=[...new Set(c.months.map(o=>raw(S.alloc,r,o.k)))]; return vals.length===1 ? {v:vals[0]} : {v:"",mixed:true}; }
   return {v:raw(S.alloc,r,c.k)};
 }
 function setCell(r,c,v){
-  if(S.view==="semana"){ S.allocW[r]={...(S.allocW[r]||{})}; if(v==="") delete S.allocW[r][c.k]; else S.allocW[r][c.k]=v; return; }
+  if(c.t==="w"){ S.allocW[r]={...(S.allocW[r]||{})}; if(v==="") delete S.allocW[r][c.k]; else S.allocW[r][c.k]=v; return; }
   S.alloc[r]={...(S.alloc[r]||{})};
-  const ks = S.view==="ano" ? c.months.map(o=>o.k) : [c.k];
+  const ks = c.t==="y" ? c.months.map(o=>o.k) : [c.k];
   for(const k of ks){ if(v==="") delete S.alloc[r][k]; else S.alloc[r][k]=v; }
 }
-// horas e valor bruto de um cargo numa coluna
 function cellCalc(r,sc,c){
   if(!S.sel[r]) return {h:0,vb:0};
-  if(S.view==="semana"){ const p=pnum(raw(S.allocW,r,c.k))/100; let h=0,vb=0; for(const d of c.days){ const hh=S.hd*p; h+=hh; vb+=hh*sc*factor(d.y,d.m); } return {h,vb}; }
-  const ms = S.view==="ano" ? c.months : [c];
+  if(c.t==="w"){ const p=pnum(raw(S.allocW,r,c.k))/100; let h=0,vb=0; for(const d of c.days){ const hh=S.hd*p; h+=hh; vb+=hh*sc*factor(d.y,d.m); } return {h,vb}; }
+  const ms = c.t==="y" ? c.months : [c];
   let h=0,vb=0; for(const o of ms){ const hh=hoursMonth(o)*pnum(raw(S.alloc,r,o.k))/100; h+=hh; vb+=hh*sc*factor(o.y,o.m); } return {h,vb};
 }
-// ao trocar entre semana e mês/ano, copia os % se a outra visão estiver vazia para o cargo
 function seedOnSwitch(to){
+  const days=bizDays();
   if(to==="semana"){
-    const days=bizDays(); const firstDay={}; for(const d of days) if(!firstDay[d.wk]) firstDay[d.wk]=d;
-    for(const [r] of ROLES){ if(Object.keys(S.allocW[r]||{}).length || !Object.keys(S.alloc[r]||{}).length) continue;
+    const firstDay={}; for(const d of days) if(!firstDay[d.wk]) firstDay[d.wk]=d;
+    for(const {id:r} of S.rows){ if(Object.keys(S.allocW[r]||{}).length || !Object.keys(S.alloc[r]||{}).length) continue;
       S.allocW[r]={}; for(const wk in firstDay){ const v=raw(S.alloc,r,firstDay[wk].mk); if(v!=="") S.allocW[r][wk]=v; } }
   } else {
-    const days=bizDays(); const firstOfMonth={}; for(const d of days) if(!firstOfMonth[d.mk]) firstOfMonth[d.mk]=d;
-    for(const [r] of ROLES){ if(Object.keys(S.alloc[r]||{}).length || !Object.keys(S.allocW[r]||{}).length) continue;
+    const firstOfMonth={}; for(const d of days) if(!firstOfMonth[d.mk]) firstOfMonth[d.mk]=d;
+    for(const {id:r} of S.rows){ if(Object.keys(S.alloc[r]||{}).length || !Object.keys(S.allocW[r]||{}).length) continue;
       S.alloc[r]={}; for(const mk in firstOfMonth){ const v=raw(S.allocW,r,firstOfMonth[mk].wk); if(v!=="") S.alloc[r][mk]=v; } }
   }
 }
 const chip=c=> c.fmax>1 ? `<br><span class="adjc">+${NF(2).format((c.fmax-1)*100)}%${c.fmin!==c.fmax?" parcial":""}</span>` : "";
+function rowLabel(row){
+  const same=S.rows.filter(r=>r.role===row.role); const n=same.indexOf(row)+1;
+  return ROLE[row.role].nm + (same.length>1 ? ` ${n}` : "");
+}
 
 const MARKUP = `
 <div class="dash" id="imcDash">
@@ -1564,9 +1592,9 @@ const MARKUP = `
       <div class="field" style="width:auto"><label>Horas por mês</label><div class="seg" role="group" aria-label="Base de horas"><button id="imcBDu" type="button">Dias úteis do mês</button><button id="imcBFx" type="button">Fixa</button></div></div>
       <div class="field f-real" id="imcHdBox"><label for="imcHd">Horas por dia</label><div class="inp"><input id="imcHd" type="text" inputmode="decimal"><span>h</span></div></div>
       <div class="field f-real" id="imcHmBox"><label for="imcHm">Horas/mês (100%)</label><div class="inp"><input id="imcHm" type="text" inputmode="decimal"><span>h</span></div></div>
-      <div class="field" style="width:auto"><label>Ver por</label><div class="seg" role="group" aria-label="Visão da tabela"><button id="imcVS" type="button" data-v="semana">Semana</button><button id="imcVM" type="button" data-v="mes">Mês</button><button id="imcVA" type="button" data-v="ano">Ano</button></div></div>
+      <div class="field" style="width:auto"><label>Ver por</label><div class="seg" role="group" aria-label="Visão da tabela"><button id="imcVS" type="button">Semana</button><button id="imcVM" type="button">Mês</button><button id="imcVA" type="button">Ano</button></div></div>
     </div>
-    <div class="proj-foot"><span id="imcHint"></span><span class="imc-actions"><label class="check" style="padding:0"><input type="checkbox" id="imcOnly"><span>Mostrar só cargos selecionados</span></label><button class="btn link danger" id="imcClear" type="button">Limpar tabela</button><button class="btn" id="imcCopy" type="button">Copiar resumo</button><button class="btn" id="imcDl" type="button">Baixar esta aba</button></span></div>
+    <div class="proj-foot"><span id="imcHint"></span><span class="imc-actions"><label class="check" style="padding:0"><input type="checkbox" id="imcOnly"><span>Mostrar só linhas selecionadas</span></label><button class="btn link danger" id="imcClear" type="button">Limpar tabela</button><button class="btn" id="imcCopy" type="button">Copiar resumo</button><button class="btn" id="imcDl" type="button">Baixar esta aba</button></span></div>
   </section>
 
   <section class="c12 imc-sum" aria-label="Resumo do orçamento">
@@ -1574,62 +1602,101 @@ const MARKUP = `
       <div class="hero"><span>Valor líquido do projeto</span><b id="imcLiq">R$ 0,00</b></div>
       <div><span>Total de horas</span><b id="imcH">0 h</b></div>
       <div><span>Valor bruto (sem realização)</span><b id="imcBruto">R$ 0,00</b></div>
+      <div><span>Valor líquido por mês</span><b id="imcMes">R$ 0,00</b></div>
       <div><span>Taxa média líquida</span><b id="imcTaxa">—</b></div>
     </div>
   </section>
 
   <section class="card c12" aria-label="Alocação por cargo">
-    <div class="card-hd"><h3 id="imcTitle">Alocação por cargo e mês</h3><span class="sub" id="imcPeriod"></span></div>
+    <div class="card-hd"><h3 id="imcTitle">Alocação por cargo e mês</h3>
+      <span class="imc-actions"><span class="sub" id="imcPeriod"></span><button class="btn" id="imcSelMode" type="button" aria-pressed="false">Selecionar células</button></span></div>
+    <div class="selbar" id="imcSelBar" hidden>
+      <b id="imcSelN"></b>
+      <div class="inp" style="width:110px"><input id="imcSelVal" type="text" inputmode="decimal" placeholder="%" aria-label="Valor para as células selecionadas"><span>%</span></div>
+      <button class="btn primary" id="imcSelApply" type="button">Aplicar</button>
+      <button class="btn" id="imcSelClear" type="button">Limpar células</button>
+      <button class="btn link" id="imcSelCancel" type="button">Cancelar seleção</button>
+      <span class="sub">Delete limpa · Esc cancela</span>
+    </div>
     <div class="tbl imc-scroll"><table class="imc" id="imcTbl"></table></div>
+  </section>
+
+  <section class="card c12" aria-label="Resumo por cargo">
+    <div class="card-hd"><h3>Resumo por cargo</h3><span class="sub">Alocação média = horas ÷ horas disponíveis dos recursos no período</span></div>
+    <div class="tbl" id="imcRoles"></div>
   </section>
   <p class="source c12" id="imcMsg" role="status"></p>
 </div>`;
 
-let COLS=[];
+let COLS=[], VROWS=[];
+const SEL=new Set(); let anchor=null, drag=0;
+const ck=(r,i)=>`${r}|${i}`;
 function render(){
   if(!ROOT.querySelector("#imcDash")){ ROOT.innerHTML=MARKUP; bind(); }
+  const M=months(); const YS=yearsOf(M);
+  if(S.allYears){ for(const y of YS) S.coll[y]=true; delete S.allYears; }
   COLS=columns();
   const ae=document.activeElement, g=id=>document.getElementById(id);
   const setv=(id,v)=>{ const el=g(id); if(el!==ae) el.value=v; };
   setv("imcIni",S.ini); setv("imcFim",fim()); setv("imcN",S.n); setv("imcReal",NF(2).format(S.real)); setv("imcReaj",NF(2).format(S.reaj));
   setv("imcHd",NF(2).format(S.hd)); setv("imcHm",NF(2).format(S.hm));
   g("imcBDu").setAttribute("aria-pressed",String(S.base!=="fixo")); g("imcBFx").setAttribute("aria-pressed",String(S.base==="fixo"));
-  for(const id of ["imcVS","imcVM","imcVA"]) g(id).setAttribute("aria-pressed",String(g(id).dataset.v===S.view));
+  const allC=YS.every(isColl), noneC=YS.every(y=>!isColl(y));
+  g("imcVS").setAttribute("aria-pressed",String(S.view==="semana"));
+  g("imcVM").setAttribute("aria-pressed",String(S.view==="mes" && noneC));
+  g("imcVA").setAttribute("aria-pressed",String(S.view==="mes" && allC));
   g("imcHmBox").hidden = S.base!=="fixo" || S.view==="semana";
   g("imcHdBox").hidden = S.base==="fixo" && S.view!=="semana";
   g("imcOnly").checked=!!S.onlySel;
-  const M=months();
+  g("imcSelMode").setAttribute("aria-pressed",String(!!S.selMode));
   g("imcPeriod").textContent=`${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} · ${M.length} ${M.length===1?"mês":"meses"}`;
-  g("imcTitle").textContent= S.view==="semana" ? "Alocação por cargo e semana" : (S.view==="ano" ? "Alocação por cargo e ano" : "Alocação por cargo e mês");
-  g("imcHint").textContent = S.view==="semana"
+  g("imcTitle").textContent= S.view==="semana" ? "Alocação por cargo e semana" : "Alocação por cargo e mês";
+  g("imcHint").textContent = (S.view==="semana"
     ? `Cada semana usa os dias úteis dela × ${NF(1).format(S.hd)} h. A visão por semana tem alocação própria; ao trocar, os % são copiados se a outra visão estiver vazia.`
-    : (S.view==="ano" ? "O % digitado no ano vale para todos os meses dele. \"Vários\" indica meses com % diferentes." : (S.base==="fixo" ? `Cada mês tem ${NF(1).format(S.hm)} h a 100%.` : `Horas do mês = dias úteis (sem feriados nacionais) × ${NF(1).format(S.hd)} h.`)) + " Reajuste a cada abril, composto. Vazio = 0%.";
-  const head=`<thead><tr><th class="stk">Cargo</th><th class="n">No projeto</th>${COLS.map((c,i)=>`<th class="n ${c.fmax>1?"imadj":""}">${esc(c.label)}${S.view==="semana"?`<br><span class="bdays">${esc(c.sub)}</span>`:`<br><span class="bdays">${esc(c.sub)}</span>`}${chip(c)}</th>`).join("")}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
-  const body=ROLES.map(([id,nm,sc])=>{
-    const on=!!S.sel[id];
+    : (S.base==="fixo" ? `Cada mês tem ${NF(1).format(S.hm)} h a 100%.` : `Horas do mês = dias úteis (sem feriados nacionais) × ${NF(1).format(S.hd)} h.`) + " Clique no ano para recolher ou abrir os meses.")
+    + " Arraste sobre as células para selecionar várias. Reajuste a cada abril. Vazio = 0%.";
+  // cabeçalho: faixa de anos (com recolher/abrir) + colunas
+  let yearRow="";
+  if(S.view==="mes"){
+    yearRow=`<tr class="yrow"><th class="stk" rowspan="2">Cargo</th><th class="n" rowspan="2">No projeto</th>${YS.map(y=>{ const span=COLS.filter(c=>c.y===y).length; return `<th colspan="${span}" class="ygrp"><button type="button" class="ytog" data-y="${y}" aria-expanded="${!isColl(y)}">${isColl(y)?"▸":"▾"} ${y}</button></th>`; }).join("")}<th class="n" rowspan="2">Total h</th><th class="n" rowspan="2">Valor líquido</th></tr>`;
+  }
+  const colHead=COLS.map(c=>`<th class="n ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}">${esc(c.label)}<br><span class="bdays">${esc(c.sub)}</span>${chip(c)}</th>`).join("");
+  const head = S.view==="mes"
+    ? `<thead>${yearRow}<tr>${colHead}</tr></thead>`
+    : `<thead><tr><th class="stk">Cargo</th><th class="n">No projeto</th>${colHead}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
+  VROWS=[];
+  const body=S.rows.map(row=>{
+    const id=row.id, R=ROLE[row.role], on=!!S.sel[id];
     if(S.onlySel && !on) return "";
-    return `<tr data-r="${id}" class="${on?"":"imoff"}"><td class="stk"><div class="who">${esc(nm)}</div><div class="lvl">R$ ${NF(0).format(sc)}/h base</div><button class="btn link rep" data-rep="${id}" type="button" title="Preenche os vazios com o último % à esquerda">Repetir →</button></td>
-      <td class="n"><input type="checkbox" data-sel="${id}" ${on?"checked":""} aria-label="${esc(nm)} entra no projeto"></td>
-      ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${c.fmax>1?"imadj":""}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" aria-label="${esc(nm)} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
+    VROWS.push(id);
+    const multi=S.rows.filter(r=>r.role===row.role).length>1;
+    return `<tr data-row="${id}" class="${on?"":"imoff"}"><td class="stk"><div class="who">${esc(rowLabel(row))}</div>
+        <input class="nmin" data-name="${id}" type="text" value="${esc(row.name||"")}" placeholder="nome (opcional)" aria-label="Nome para ${esc(rowLabel(row))}">
+        <div class="lvl">R$ ${NF(0).format(R.sc)}/h base</div>
+        <div class="rowacts"><button class="btn link" data-rep="${id}" type="button" title="Preenche os vazios com o último % à esquerda">Repetir →</button><button class="btn link" data-add="${row.role}" type="button" title="Adicionar outra pessoa com este cargo">+ outro</button>${multi?`<button class="btn link danger" data-del="${id}" type="button" title="Remover esta linha">remover</button>`:""}</div></td>
+      <td class="n"><input type="checkbox" data-sel="${id}" ${on?"checked":""} aria-label="${esc(rowLabel(row))} entra no projeto"></td>
+      ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}" data-r="${id}" data-i="${i}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" ${S.selMode?"readonly":""} aria-label="${esc(rowLabel(row))} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
       <td class="n" id="th_${id}"></td><td class="n" id="tv_${id}"></td></tr>`;
   }).join("");
   const foot=`<tr class="tot"><td class="stk">Total</td><td></td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div id="ch_${i}"></div><div class="mv" id="cv_${i}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
   g("imcTbl").innerHTML=head+`<tbody>${body}${foot}</tbody>`;
-  recalc();
+  g("imcTbl").classList.toggle("selmode",!!S.selMode);
+  for(const k of [...SEL]){ const [r,i]=k.split("|"); if(!VROWS.includes(r) || +i>=COLS.length) SEL.delete(k); }
+  paintSel(); recalc();
 }
 function calc(){
-  const cols=COLS.length?COLS:columns(); const R=S.real/100;
+  const cols=COLS.length?COLS:columns(); const Rz=S.real/100;
   const rows={}, colH=cols.map(()=>0), colV=cols.map(()=>0); let H=0, Vb=0;
-  for(const [id,nm,sc] of ROLES){
-    let rh=0, rv=0; const cells=[];
-    cols.forEach((c,i)=>{ const x=cellCalc(id,sc,c); cells.push(x); rh+=x.h; rv+=x.vb; colH[i]+=x.h; colV[i]+=x.vb*R; });
-    rows[id]={nm,sc,cells,h:rh,vb:rv,vl:rv*R}; H+=rh; Vb+=rv;
+  for(const row of S.rows){
+    const sc=ROLE[row.role].sc; let rh=0, rv=0; const cells=[];
+    cols.forEach((c,i)=>{ const x=cellCalc(row.id,sc,c); cells.push(x); rh+=x.h; rv+=x.vb; colH[i]+=x.h; colV[i]+=x.vb*Rz; });
+    rows[row.id]={row,sc,cells,h:rh,vb:rv,vl:rv*Rz}; H+=rh; Vb+=rv;
   }
-  return {cols,rows,colH,colV,H,Vb,VL:Vb*R};
+  return {cols,rows,colH,colV,H,Vb,VL:Vb*Rz};
 }
 function recalc(){
   const C=calc(); const fh=v=>`${NF(1).format(v)} h`, g=id=>document.getElementById(id);
-  for(const [id] of ROLES){
+  for(const {id} of S.rows){
     const r=C.rows[id];
     C.cols.forEach((c,i)=>{ const el=g(`h_${id}_${i}`); if(el) el.textContent = r.cells[i].h>0 ? fh(r.cells[i].h) : ""; });
     const th=g(`th_${id}`), tv=g(`tv_${id}`);
@@ -1640,15 +1707,47 @@ function recalc(){
   g("imcTH").textContent=fh(C.H); g("imcTV").textContent=BRL.format(C.VL);
   g("imcLiq").textContent=BRL.format(C.VL); g("imcH").textContent=fh(C.H); g("imcBruto").textContent=BRL.format(C.Vb);
   g("imcTaxa").textContent= C.H>0 ? `${BRL.format(C.VL/C.H)}/h` : "—";
+  g("imcMes").textContent= BRL.format(C.VL/Math.max(1,S.n));
+  // resumo por cargo
+  const cap100=c=> c.t==="w" ? c.days.length*S.hd : (c.t==="y" ? c.months.reduce((a,o)=>a+hoursMonth(o),0) : hoursMonth(c));
+  const capRow=C.cols.reduce((a,c)=>a+cap100(c),0);
+  const byRole=ROLES.map(([rid,nm,sc])=>{ const rs=S.rows.filter(r=>r.role===rid).map(r=>C.rows[r.id]).filter(x=>x.h>0); const h=rs.reduce((a,x)=>a+x.h,0), vl=rs.reduce((a,x)=>a+x.vl,0); return {nm,sc,n:rs.length,h,vl,alloc: rs.length&&capRow? h/(rs.length*capRow):0}; }).filter(x=>x.n>0);
+  const nRec=byRole.reduce((a,x)=>a+x.n,0);
+  g("imcRoles").innerHTML = byRole.length ? `<table><thead><tr><th>Cargo</th><th class="n">Recursos</th><th class="n">Alocação média</th><th class="n">Horas</th><th class="n">Horas/mês</th><th class="n">Valor líquido</th><th class="n">Valor/mês</th><th class="n">% do valor</th></tr></thead><tbody>
+    ${byRole.map(x=>`<tr><td><div class="who">${esc(x.nm)}</div><div class="lvl">R$ ${NF(0).format(x.sc)}/h base</div></td><td class="n">${x.n}</td><td class="n">${NF(1).format(x.alloc*100)}%</td><td class="n">${fh(x.h)}</td><td class="n">${fh(x.h/Math.max(1,S.n))}</td><td class="n">${BRL.format(x.vl)}</td><td class="n">${BRL.format(x.vl/Math.max(1,S.n))}</td><td class="n">${C.VL>0?NF(1).format(x.vl/C.VL*100):"0"}%</td></tr>`).join("")}
+    <tr class="tot"><td>Total</td><td class="n">${nRec}</td><td class="n">${nRec&&capRow?NF(1).format(C.H/(nRec*capRow)*100):"0"}%</td><td class="n">${fh(C.H)}</td><td class="n">${fh(C.H/Math.max(1,S.n))}</td><td class="n">${BRL.format(C.VL)}</td><td class="n">${BRL.format(C.VL/Math.max(1,S.n))}</td><td class="n">100%</td></tr></tbody></table>`
+    : `<p class="muted" style="margin:0">Preencha a alocação na tabela para ver o resumo por cargo.</p>`;
   return C;
 }
+/* seleção de células */
+function paintSel(){
+  const t=document.getElementById("imcTbl");
+  for(const td of t.querySelectorAll("td.cell")) td.classList.toggle("imsel", SEL.has(ck(td.dataset.r,td.dataset.i)));
+  const bar=document.getElementById("imcSelBar"); bar.hidden=SEL.size===0;
+  document.getElementById("imcSelN").textContent=`${SEL.size} ${SEL.size===1?"célula selecionada":"células selecionadas"}`;
+}
+function rect(a,b){
+  SEL.clear();
+  const r1=VROWS.indexOf(a.r), r2=VROWS.indexOf(b.r); if(r1<0||r2<0) return;
+  const [ra,rb]=[Math.min(r1,r2),Math.max(r1,r2)], [ca,cb]=[Math.min(a.i,b.i),Math.max(a.i,b.i)];
+  for(let r=ra;r<=rb;r++) for(let i=ca;i<=cb;i++) SEL.add(ck(VROWS[r],i));
+  paintSel();
+}
+function applySel(v){
+  if(!SEL.size) return;
+  if(v!=="" && parseNum(v)==null){ msg("Digite um número, por exemplo 20 ou 12,5."); return; }
+  for(const k of SEL){ const [r,i]=k.split("|"); setCell(r,COLS[+i],v); if(v!=="") S.sel[r]=true; }
+  save(); render(); msg(v===""?`${SEL.size} células limpas.`:`${v}% aplicado em ${SEL.size} células.`);
+}
+const cellOf=el=>{ const td=el && el.closest && el.closest("td.cell"); return td ? {r:td.dataset.r, i:+td.dataset.i} : null; };
+
 function summaryText(){
   const C=calc(); const M=months();
   const base = (S.view==="semana"||S.base!=="fixo") ? `horas pelos dias úteis × ${NF(2).format(S.hd)} h/dia` : `${NF(2).format(S.hm)} h/mês a 100%`;
   const L=[`Orçamento Advisory/CMG — ${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} (${M.length} ${M.length===1?"mês":"meses"})`,
     `Realização ${NF(2).format(S.real)}% · ${base} · reajuste ${NF(2).format(S.reaj)}% a.a. em abril (scales base abr/2026)${S.view==="semana"?" · alocação por semana":""}`, ""];
-  for(const [id] of ROLES){ const r=C.rows[id]; if(r.h>0) L.push(`${r.nm} (R$ ${NF(0).format(r.sc)}/h base): ${NF(1).format(r.h)} h · ${BRL.format(r.vl)}`); }
-  L.push("", `Total: ${NF(1).format(C.H)} h`, `Valor bruto: ${BRL.format(C.Vb)}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
+  for(const row of S.rows){ const r=C.rows[row.id]; if(r.h>0) L.push(`${rowLabel(row)}${row.name?` (${row.name})`:""} — R$ ${NF(0).format(r.sc)}/h base: ${NF(1).format(r.h)} h · ${BRL.format(r.vl)}`); }
+  L.push("", `Total: ${NF(1).format(C.H)} h`, `Valor líquido por mês: ${BRL.format(C.VL/Math.max(1,S.n))}`, `Valor bruto: ${BRL.format(C.Vb)}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
   return L.join("\n");
 }
 function msg(t){ const m=document.getElementById("imcMsg"); m.textContent=t; clearTimeout(msg.t); msg.t=setTimeout(()=>{m.textContent="";},6000); }
@@ -1682,7 +1781,7 @@ async function download(){
 function bind(){
   const g=id=>document.getElementById(id);
   g("imcIni").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ S.ini=e.target.value; save(); render(); } });
-  g("imcFim").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ S.n=Math.max(1,Math.min(36,diffMonths(S.ini,e.target.value)+1)); if(diffMonths(S.ini,e.target.value)+1>36) msg("O período vai até 36 meses."); save(); render(); } });
+  g("imcFim").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ const d=diffMonths(S.ini,e.target.value)+1; S.n=Math.max(1,Math.min(36,d)); if(d>36) msg("O período vai até 36 meses."); save(); render(); } });
   g("imcN").addEventListener("change",e=>{ const v=parseNum(e.target.value); if(v!=null){ S.n=Math.max(1,Math.min(36,Math.round(v))); } save(); render(); });
   for(const [id,k] of [["imcReal","real"],["imcHm","hm"],["imcHd","hd"],["imcReaj","reaj"]]){
     g(id).addEventListener("input",e=>{ const v=parseNum(e.target.value); if(v!=null && v>=0){ S[k]=v; save(); if(k==="reaj") return; recalc(); } });
@@ -1690,16 +1789,59 @@ function bind(){
   }
   g("imcBDu").addEventListener("click",()=>{ S.base="du"; save(); render(); });
   g("imcBFx").addEventListener("click",()=>{ S.base="fixo"; save(); render(); });
-  for(const id of ["imcVS","imcVM","imcVA"]) g(id).addEventListener("click",e=>{ const v=e.currentTarget.dataset.v; if(v===S.view) return; const was=usesWeekly(); S.view=v; if(was!==usesWeekly()) seedOnSwitch(v); save(); render(); });
+  const setView=(v,collAll)=>{ const was=S.view==="semana"; S.view=v; if(was!==(v==="semana")) seedOnSwitch(v); if(v==="mes"){ for(const y of yearsOf(months())) S.coll[y]=collAll; } SEL.clear(); save(); render(); };
+  g("imcVS").addEventListener("click",()=>setView("semana"));
+  g("imcVM").addEventListener("click",()=>setView("mes",false));
+  g("imcVA").addEventListener("click",()=>setView("mes",true));
   g("imcOnly").addEventListener("change",e=>{ S.onlySel=e.target.checked; save(); render(); });
+  g("imcSelMode").addEventListener("click",()=>{ S.selMode=!S.selMode; anchor=null; save(); render(); if(S.selMode) msg("Toque na primeira e depois na última célula do bloco."); });
   g("imcClear").addEventListener("click",e=>{
-    const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.allocW={}; S.sel={}; save(); render(); msg("Tabela limpa."); return; }
+    const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.allocW={}; S.sel={}; SEL.clear(); save(); render(); msg("Tabela limpa."); return; }
     b.dataset.confirm="1"; b.textContent="Confirmar limpeza"; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.confirm; b.textContent="Limpar tabela"; } },4000);
   });
   g("imcCopy").addEventListener("click",copySummary);
   g("imcDl").addEventListener("click",download);
+  g("imcSelApply").addEventListener("click",()=>applySel(g("imcSelVal").value.trim()));
+  g("imcSelVal").addEventListener("keydown",e=>{ if(e.key==="Enter"){ e.preventDefault(); applySel(e.target.value.trim()); } });
+  g("imcSelClear").addEventListener("click",()=>applySel(""));
+  g("imcSelCancel").addEventListener("click",()=>{ SEL.clear(); anchor=null; paintSel(); });
+  document.addEventListener("keydown",e=>{
+    if(!SEL.size || ROOT.offsetParent===null) return;
+    const t=e.target; if(t && t.matches && t.matches("input,textarea,select") && t.id!=="imcSelVal" && !t.classList.contains("pin")) return;
+    if(t && t.id==="imcSelVal") return;
+    if(e.key==="Escape"){ SEL.clear(); anchor=null; paintSel(); }
+    else if((e.key==="Delete"||e.key==="Backspace") && (!t.classList||!t.classList.contains("pin")||SEL.size>1)){ e.preventDefault(); applySel(""); }
+    else if(/^[0-9]$/.test(e.key) && SEL.size>1){ e.preventDefault(); const v=g("imcSelVal"); v.value=e.key; v.focus(); }
+  });
   const tbl=g("imcTbl");
+  // arrastar com o mouse para selecionar um bloco; Shift+clique estende
+  tbl.addEventListener("pointerdown",e=>{
+    if(e.pointerType!=="mouse" || e.button!==0) return;
+    const c=cellOf(e.target); if(!c) return;
+    if(e.shiftKey && anchor){ e.preventDefault(); rect(anchor,c); return; }
+    anchor=c; drag=1; if(SEL.size && !SEL.has(ck(c.r,c.i))){ SEL.clear(); paintSel(); }
+  });
+  tbl.addEventListener("pointerover",e=>{
+    if(!drag) return; const c=cellOf(e.target); if(!c) return;
+    if(c.r===anchor.r && c.i===anchor.i && drag===1) return;
+    if(drag===1){ drag=2; tbl.classList.add("dragging"); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
+    rect(anchor,c);
+  });
+  document.addEventListener("pointerup",()=>{ if(drag===2){ const v=g("imcSelVal"); v.value=""; setTimeout(()=>v.focus(),0); } drag=0; tbl.classList.remove("dragging"); });
+  tbl.addEventListener("click",e=>{
+    if(S.selMode){ const c=cellOf(e.target); if(c){ if(!anchor){ anchor=c; SEL.clear(); SEL.add(ck(c.r,c.i)); paintSel(); } else { rect(anchor,c); anchor=null; } return; } }
+    const y=e.target.closest("button.ytog"); if(y){ const yy=+y.dataset.y; S.coll[yy]=!isColl(yy); SEL.clear(); save(); render(); return; }
+    const add=e.target.closest("button[data-add]"); if(add){ const role=add.dataset.add; const id=uid(role); const last=[...S.rows].reverse().find(r=>r.role===role); S.rows.splice(S.rows.indexOf(last)+1,0,{id,role,name:""}); S.sel[id]=true; save(); render(); const nm=tbl.querySelector(`input[data-name="${id}"]`); if(nm) nm.focus(); return; }
+    const del=e.target.closest("button[data-del]"); if(del){ const id=del.dataset.del; if(del.dataset.confirm){ S.rows=S.rows.filter(r=>r.id!==id); delete S.alloc[id]; delete S.allocW[id]; delete S.sel[id]; save(); render(); } else { del.dataset.confirm="1"; del.textContent="confirmar"; setTimeout(()=>{ if(del.isConnected){ delete del.dataset.confirm; del.textContent="remover"; } },4000); } return; }
+    const b=e.target.closest("button[data-rep]"); if(b){
+      const r=b.dataset.rep; let last=null, filled=0;
+      for(const c of COLS){ const cv=getCell(r,c); if(cv.mixed){ last=null; continue; } if(cv.v!==""){ last=cv.v; continue; } if(last!=null){ setCell(r,c,last); filled++; } }
+      if(last==null && !filled){ msg("Digite o % de pelo menos um período dessa linha antes de repetir."); return; }
+      S.sel[r]=true; save(); render(); return;
+    }
+  });
   tbl.addEventListener("input",e=>{
+    const nm=e.target.closest("input[data-name]"); if(nm){ const row=S.rows.find(r=>r.id===nm.dataset.name); if(row){ row.name=nm.value; save(); } return; }
     const el=e.target.closest("input.pin"); if(!el) return;
     const r=el.dataset.r, c=COLS[+el.dataset.i], v=el.value.trim();
     setCell(r,c,v);
@@ -1707,17 +1849,9 @@ function bind(){
     save(); recalc();
   });
   tbl.addEventListener("change",e=>{
-    if(e.target.closest("input.pin")){ if(S.view==="ano") render(); return; }
+    if(e.target.closest("input.pin")){ if(COLS[+e.target.dataset.i].t==="y") render(); return; }
     const cb=e.target.closest("input[data-sel]"); if(!cb) return;
     S.sel[cb.dataset.sel]=cb.checked; save(); render();
-  });
-  // Repetir →: preenche cada coluna vazia com o último % digitado à esquerda
-  tbl.addEventListener("click",e=>{
-    const b=e.target.closest("button[data-rep]"); if(!b) return;
-    const r=b.dataset.rep; let last=null, filled=0;
-    for(const c of COLS){ const cv=getCell(r,c); if(cv.mixed){ last=null; continue; } if(cv.v!==""){ last=cv.v; continue; } if(last!=null){ setCell(r,c,last); filled++; } }
-    if(last==null && !filled){ msg("Digite o % de pelo menos um período desse cargo antes de repetir."); return; }
-    S.sel[r]=true; save(); render();
   });
 }
 load(); render();
