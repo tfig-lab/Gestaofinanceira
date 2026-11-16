@@ -1669,6 +1669,8 @@ function seedOnSwitch(to){
       S.alloc[r]={}; for(const mk in firstOfMonth){ const v=raw(S.allocW,r,firstOfMonth[mk].wk); if(v!=="") S.alloc[r][mk]=v; } }
   }
 }
+// faixa de cor por ano civil: primeiro ano do período claro, o seguinte sombreado, e assim por diante
+const band=c=>{ const y0=+S.ini.slice(0,4); return ((c.y-y0)%2===1) ? "imadj" : ""; };
 const chip=c=> c.fmax>1 ? `<br><span class="adjc">+${NF(2).format((c.fmax-1)*100)}%</span>` : "";
 function rowLabel(row){
   const same=S.rows.filter(r=>r.role===row.role && r.front===row.front); const n=same.indexOf(row)+1;
@@ -1772,9 +1774,9 @@ function render(){
   // cabeçalho: faixa de anos (com recolher/abrir) + colunas
   let yearRow="";
   if(S.view==="mes"){
-    yearRow=`<tr class="yrow"><th class="stk" rowspan="2">Frente / cargo</th>${YS.map(y=>{ const span=COLS.filter(c=>c.y===y).length; return `<th colspan="${span}" class="ygrp"><button type="button" class="ytog" data-y="${y}" aria-expanded="${!isColl(y)}">${isColl(y)?"▸":"▾"} ${y}</button></th>`; }).join("")}<th class="n" rowspan="2">Valor líquido</th><th class="n" rowspan="2">Total h</th></tr>`;
+    yearRow=`<tr class="yrow"><th class="stk" rowspan="2">Frente / cargo</th>${YS.map(y=>{ const span=COLS.filter(c=>c.y===y).length; return `<th colspan="${span}" class="ygrp ${band({y})}"><button type="button" class="ytog" data-y="${y}" aria-expanded="${!isColl(y)}">${isColl(y)?"▸":"▾"} ${y}</button></th>`; }).join("")}<th class="n" rowspan="2">Valor líquido</th><th class="n" rowspan="2">Total h</th></tr>`;
   }
-  const colHead=COLS.map(c=>`<th class="n ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}">${esc(c.label)}<br><span class="bdays">${esc(c.sub)}</span>${chip(c)}</th>`).join("");
+  const colHead=COLS.map(c=>`<th class="n ${band(c)} ${c.t==="y"?"ycol":""}">${esc(c.label)}<br><span class="bdays">${esc(c.sub)}</span>${chip(c)}</th>`).join("");
   const head = S.view==="mes"
     ? `<thead>${yearRow}<tr>${colHead}</tr></thead>`
     : `<thead><tr><th class="stk">Frente / cargo</th>${colHead}<th class="n">Valor líquido</th><th class="n">Total h</th></tr></thead>`;
@@ -1787,7 +1789,7 @@ function render(){
     return `<tr data-row="${id}" class="rrow"><td class="stk"><div class="rwho"><select class="rsel" data-role="${id}" title="Trocar o cargo desta linha" aria-label="Cargo de ${esc(rowLabel(row))}">${ROLES.map(([rid,nm])=>`<option value="${rid}" ${rid===row.role?"selected":""}>${esc(nm)}</option>`).join("")}</select>${num?`<span>${num}</span>`:""}
         <span class="icos"><button class="ico" data-rep="${id}" type="button" title="Repetir: preenche os vazios com o último % à esquerda" aria-label="Repetir à direita">→</button><button class="ico" data-add="${row.role}" data-front="${row.front}" data-after="${id}" type="button" title="Adicionar outra pessoa com este cargo nesta frente" aria-label="Adicionar outro">+</button><button class="ico del" data-del="${id}" type="button" title="Remover esta linha" aria-label="Remover linha">×</button></span></div>
         <input class="nmin" data-name="${id}" type="text" value="${esc(row.name||"")}" placeholder="nome (opcional)" aria-label="Nome para ${esc(rowLabel(row))}"></td>
-      ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}" data-r="${id}" data-i="${i}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" ${S.selMode?"readonly":""} aria-label="${esc(rowLabel(row))} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
+      ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${band(c)} ${c.t==="y"?"ycol":""}" data-r="${id}" data-i="${i}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" ${S.selMode?"readonly":""} aria-label="${esc(rowLabel(row))} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
       <td class="n" id="tv_${id}"></td><td class="n" id="th_${id}"></td></tr>`;
   };
   const body=S.fronts.map(f=>{
@@ -1796,14 +1798,14 @@ function render(){
         <div class="fhd"><button type="button" class="ftog" data-ftog="${f.id}" aria-expanded="${!f.coll}" title="${f.coll?"Abrir":"Recolher"} frente">${f.coll?"▸":"▾"}</button><input class="fnm" data-fname="${f.id}" type="text" value="${esc(f.name)}" aria-label="Nome da frente"></div>
         <div class="rowacts"><div class="inp fadd"><select data-fadd="${f.id}" aria-label="Adicionar cargo à frente ${esc(f.name)}">${roleOpts}</select></div><button class="btn link danger" data-fdel="${f.id}" type="button">remover frente</button></div>
         <div class="lvl">${rs.length} ${rs.length===1?"recurso":"recursos"}</div></td>
-      ${COLS.map((c,i)=>`<td class="n fsub ${c.fmax>1?"imadj":""}"><div class="mv" id="fv_${f.id}_${i}"></div><div class="mh" id="fh_${f.id}_${i}"></div></td>`).join("")}
+      ${COLS.map((c,i)=>`<td class="n fsub ${band(c)}"><div class="mv" id="fv_${f.id}_${i}"></div><div class="mh" id="fh_${f.id}_${i}"></div></td>`).join("")}
       <td class="n" id="ftv_${f.id}"></td><td class="n" id="fth_${f.id}"></td></tr>`;
     if(f.coll) return head;
     const inner = rs.length ? rs.map(roleRow).join("") : `<tr class="rrow"><td class="stk"><span class="muted">Use <b>+ Adicionar cargo</b> para montar esta frente.</span></td><td colspan="${COLS.length+2}"></td></tr>`;
     return head+inner;
   }).join("");
   const emptyMsg = !S.fronts.length ? `<tr><td class="stk"><span class="muted">Crie uma frente com <b>+ Nova frente</b>.</span></td><td colspan="${COLS.length+2}"></td></tr>` : "";
-  const foot=`<tr class="tot"><td class="stk">Total do projeto</td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div class="mv" id="cv_${i}"></div><div class="mh" id="ch_${i}"></div></td>`).join("")}<td class="n tv" id="imcTV"></td><td class="n" id="imcTH"></td></tr>`;
+  const foot=`<tr class="tot"><td class="stk">Total do projeto</td>${COLS.map((c,i)=>`<td class="n ${band(c)}"><div class="mv" id="cv_${i}"></div><div class="mh" id="ch_${i}"></div></td>`).join("")}<td class="n tv" id="imcTV"></td><td class="n" id="imcTH"></td></tr>`;
   g("imcTbl").innerHTML=head+`<tbody>${body}${emptyMsg}${foot}</tbody>`;
   g("imcTbl").classList.toggle("selmode",!!S.selMode);
   for(const k of [...SEL]){ const [r,i]=k.split("|"); if(!VROWS.includes(r) || +i>=COLS.length) SEL.delete(k); }
