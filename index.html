@@ -278,8 +278,42 @@ table.imc td.cell{min-width:78px;white-space:nowrap}
 table.imc tr.imoff .pin{opacity:.55}
 table.imc tr.imoff .who{color:var(--muted)}
 table.imc .rep{font-size:.74rem;margin-top:2px}
-table.imc tr.tot .mv{font-size:.74rem;font-weight:600;color:var(--accent)}
+
 @media (max-width:600px){table.imc .stk{min-width:130px;max-width:150px}.imc-sum .pstrip > div{padding:8px 10px}.imc-sum .pstrip span{font-size:.62rem}.imc-sum .pstrip b,.imc-sum .hero b{font-size:1.05rem}}
+
+
+/* IMC compacto + rolagem própria */
+.imc-scroll{max-height:calc(100vh - 150px);overflow:auto;overscroll-behavior:contain}
+table.imc th,table.imc td{padding:4px 6px}
+table.imc thead th{position:sticky;top:0;z-index:2;background:var(--card)}
+table.imc thead tr.yrow th{height:28px}
+table.imc thead tr.yrow + tr th{top:28px}
+table.imc thead th.stk{z-index:4}
+table.imc thead th.imadj{background:color-mix(in srgb, var(--soft) 100%, var(--card))}
+table.imc .stk{min-width:210px;max-width:240px}
+table.imc td.cell{min-width:60px}
+.pin{width:42px;padding:2px 4px;font-size:.82rem}
+.pct{font-size:.68rem}
+.hh{font-size:.66rem;margin-top:1px}
+.rwho{display:flex;align-items:center;gap:4px;font-weight:600;flex-wrap:nowrap;white-space:nowrap}
+.rwho .rsel{max-width:140px;overflow:hidden;text-overflow:ellipsis}
+.icos{display:inline-flex;gap:2px;margin-left:auto}
+.ico{border:1px solid transparent;background:none;color:var(--muted);border-radius:3px;font-size:.8rem;line-height:1;padding:3px 5px;cursor:pointer}
+.ico:hover{border-color:var(--line);color:var(--accent)}
+.ico.del:hover,.ico.del.on{color:var(--bad)}
+.nmin{margin:0;font-size:.72rem}
+table.imc tr.fgrp td{padding-top:6px;padding-bottom:6px}
+.selbar{position:fixed!important;left:50%;bottom:max(16px,env(safe-area-inset-bottom,0px));transform:translateX(-50%);z-index:30;box-shadow:0 8px 24px rgba(11,31,51,.18);background:var(--card)!important;max-width:calc(100vw - 32px)}
+#imcRoles tr.rgrp td{font-weight:700;background:var(--soft)}
+#imcRoles tr.rres td:first-child{padding-left:22px}
+#imcRoles tr.rres .who{font-weight:500}
+table.imc .mv{font-size:.8rem;font-weight:700;color:var(--ink)}
+table.imc .mh{font-size:.68rem;font-weight:500;color:var(--muted)}
+table.imc tr.tot .mv{font-size:.86rem;color:var(--accent)}
+table.imc tr.tot td.tv{font-size:1.05rem;color:var(--accent)}
+table.imc tr.fgrp .mv{color:var(--ink)}
+.ryinp{width:96px;margin:4px 0 0 auto}
+.ryinp input{text-align:right;padding:3px 4px}
 
 /* abas do projeto */
 .vtabs{display:flex;gap:4px;border-top:1px solid var(--line);margin:4px -18px -16px;padding:0 12px;overflow-x:auto}
@@ -1552,7 +1586,7 @@ const DEF={ini:nextMonthKey(), n:7, real:100, base:"du", hd:8, hm:168, reaj:6, v
 let S;
 function load(src){
   let v=src||null; if(!v){ try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){} }
-  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})}; S.coll={...(S.coll||{})}; S.scales={...(S.scales||{})};
+  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})}; S.coll={...(S.coll||{})}; S.scales={...(S.scales||{})}; S.reajY={...(S.reajY||{})};
   if(S.view==="ano"){ S.view="mes"; S.yearMode=true; S.coll={}; }
   if(!Array.isArray(S.rows) || !S.rows.length) S.rows=ROLES.map(([id])=>({id, role:id, name:""}));
   S.rows=S.rows.filter(r=>ROLE[r.role]);
@@ -1580,7 +1614,8 @@ function bizDays(){
 }
 // ciclos de reajuste: base abr/2026, reajuste todo abril
 const cycles=(y,m)=>Math.max(0,(y-2026)-(m<4?1:0));
-const factor=(y,m)=>Math.pow(1+S.reaj/100, cycles(y,m));
+const reajOf=yr=>{ const v=S.reajY ? S.reajY[yr] : undefined; return (typeof v==="number") ? v : S.reaj; };
+const factor=(y,m)=>{ let f=1; const c=cycles(y,m); for(let i=1;i<=c;i++) f*=1+reajOf(2026+i)/100; return f; };
 const mlabel=(y,m)=>`${MES[m-1]}/${String(y).slice(2)}`;
 const hoursMonth=o=> S.base==="fixo" ? S.hm : o.bd*S.hd;
 const raw=(store,r,k)=>{ const v=(store[r]||{})[k]; return v==null?"":String(v); };
@@ -1633,7 +1668,7 @@ function seedOnSwitch(to){
       S.alloc[r]={}; for(const mk in firstOfMonth){ const v=raw(S.allocW,r,firstOfMonth[mk].wk); if(v!=="") S.alloc[r][mk]=v; } }
   }
 }
-const chip=c=> c.fmax>1 ? `<br><span class="adjc">+${NF(2).format((c.fmax-1)*100)}%${c.fmin!==c.fmax?" parcial":""}</span>` : "";
+const chip=c=> c.fmax>1 ? `<br><span class="adjc">+${NF(2).format((c.fmax-1)*100)}%</span>` : "";
 function rowLabel(row){
   const same=S.rows.filter(r=>r.role===row.role && r.front===row.front); const n=same.indexOf(row)+1;
   return ROLE[row.role].nm + (same.length>1 ? ` ${n}` : "");
@@ -1652,7 +1687,7 @@ const MARKUP = `
         <div class="field f-mes"><label for="imcFimM">Mês final</label><div class="msel"><div class="inp"><select id="imcFimM" aria-label="Mês final"></select></div><div class="inp"><select id="imcFimY" aria-label="Ano final"></select></div></div></div>
         <div class="field f-real"><label for="imcN">Nº de meses</label><div class="inp"><input id="imcN" type="text" inputmode="numeric"></div></div>
         <div class="field f-real"><label for="imcReal">Realização</label><div class="inp"><input id="imcReal" type="text" inputmode="decimal"><span>%</span></div></div>
-        <div class="field f-real"><label for="imcReaj">Reajuste anual</label><div class="inp"><input id="imcReaj" type="text" inputmode="decimal"><span>%</span></div></div>
+        <div class="field f-real"><label for="imcReaj">Reajuste anual padrão</label><div class="inp"><input id="imcReaj" type="text" inputmode="decimal"><span>%</span></div></div>
       </div>
     </div>
     <div class="assume" style="align-items:flex-end">
@@ -1682,7 +1717,7 @@ const MARKUP = `
       <button class="btn primary" id="imcSelApply" type="button">Aplicar</button>
       <button class="btn" id="imcSelClear" type="button">Limpar células</button>
       <button class="btn link" id="imcSelCancel" type="button">Cancelar seleção</button>
-      <span class="sub">Delete limpa · Esc cancela</span>
+      <span class="sub">Digite o % e Enter · Delete limpa · Esc cancela</span>
     </div>
     <div class="tbl imc-scroll"><table class="imc" id="imcTbl"></table></div>
   </section>
@@ -1697,7 +1732,7 @@ const MARKUP = `
     <details id="imcScDet">
       <summary>Scale rates (R$/hora, base abr/2026) <span class="sub" id="imcScNote"></span></summary>
       <div class="tbl" style="margin-top:10px"><table class="sctbl" id="imcScTbl"></table></div>
-      <div class="proj-foot" style="margin-top:10px"><span>Os valores ficam salvos e passam a valer em toda a calculadora. O reajuste anual é aplicado sobre eles a cada abril.</span><button class="btn link danger" id="imcScReset" type="button">Restaurar scales padrão</button></div>
+      <div class="proj-foot" style="margin-top:10px"><span>Os valores ficam salvos e passam a valer em toda a calculadora. Em cada coluna dá para mudar o reajuste daquele abril (inclusive 0%); sem alteração vale o reajuste anual padrão. Os reajustes se acumulam.</span><button class="btn link danger" id="imcScReset" type="button">Restaurar scales padrão</button></div>
     </details>
   </section>
   <p class="source c12" id="imcMsg" role="status"></p>
@@ -1736,24 +1771,23 @@ function render(){
   // cabeçalho: faixa de anos (com recolher/abrir) + colunas
   let yearRow="";
   if(S.view==="mes"){
-    yearRow=`<tr class="yrow"><th class="stk" rowspan="2">Frente / cargo</th>${YS.map(y=>{ const span=COLS.filter(c=>c.y===y).length; return `<th colspan="${span}" class="ygrp"><button type="button" class="ytog" data-y="${y}" aria-expanded="${!isColl(y)}">${isColl(y)?"▸":"▾"} ${y}</button></th>`; }).join("")}<th class="n" rowspan="2">Total h</th><th class="n" rowspan="2">Valor líquido</th></tr>`;
+    yearRow=`<tr class="yrow"><th class="stk" rowspan="2">Frente / cargo</th>${YS.map(y=>{ const span=COLS.filter(c=>c.y===y).length; return `<th colspan="${span}" class="ygrp"><button type="button" class="ytog" data-y="${y}" aria-expanded="${!isColl(y)}">${isColl(y)?"▸":"▾"} ${y}</button></th>`; }).join("")}<th class="n" rowspan="2">Valor líquido</th><th class="n" rowspan="2">Total h</th></tr>`;
   }
   const colHead=COLS.map(c=>`<th class="n ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}">${esc(c.label)}<br><span class="bdays">${esc(c.sub)}</span>${chip(c)}</th>`).join("");
   const head = S.view==="mes"
     ? `<thead>${yearRow}<tr>${colHead}</tr></thead>`
-    : `<thead><tr><th class="stk">Frente / cargo</th>${colHead}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
+    : `<thead><tr><th class="stk">Frente / cargo</th>${colHead}<th class="n">Valor líquido</th><th class="n">Total h</th></tr></thead>`;
   VROWS=[];
   const roleOpts=`<option value="">+ Adicionar cargo</option>`+ROLES.map(([id,nm])=>`<option value="${id}">${esc(nm)} · R$ ${NF(0).format(scaleOf(id))}/h</option>`).join("");
   const roleRow=row=>{
     const id=row.id, R=ROLE[row.role];
     VROWS.push(id);
     const same=S.rows.filter(r=>r.role===row.role && r.front===row.front); const num=same.length>1?` ${same.indexOf(row)+1}`:"";
-    return `<tr data-row="${id}" class="rrow"><td class="stk"><div class="who rwho"><select class="rsel" data-role="${id}" title="Trocar o cargo desta linha" aria-label="Cargo de ${esc(rowLabel(row))}">${ROLES.map(([rid,nm])=>`<option value="${rid}" ${rid===row.role?"selected":""}>${esc(nm)}</option>`).join("")}</select>${num?`<span>${num}</span>`:""}</div>
-        <input class="nmin" data-name="${id}" type="text" value="${esc(row.name||"")}" placeholder="nome (opcional)" aria-label="Nome para ${esc(rowLabel(row))}">
-        <div class="lvl">R$ ${NF(0).format(R.sc)}/h base</div>
-        <div class="rowacts"><button class="btn link" data-rep="${id}" type="button" title="Preenche os vazios com o último % à esquerda">Repetir →</button><button class="btn link" data-add="${row.role}" data-front="${row.front}" data-after="${id}" type="button" title="Adicionar outra pessoa com este cargo nesta frente">+ outro</button><button class="btn link danger" data-del="${id}" type="button" title="Remover esta linha">remover</button></div></td>
+    return `<tr data-row="${id}" class="rrow"><td class="stk"><div class="rwho"><select class="rsel" data-role="${id}" title="Trocar o cargo desta linha" aria-label="Cargo de ${esc(rowLabel(row))}">${ROLES.map(([rid,nm])=>`<option value="${rid}" ${rid===row.role?"selected":""}>${esc(nm)}</option>`).join("")}</select>${num?`<span>${num}</span>`:""}
+        <span class="icos"><button class="ico" data-rep="${id}" type="button" title="Repetir: preenche os vazios com o último % à esquerda" aria-label="Repetir à direita">→</button><button class="ico" data-add="${row.role}" data-front="${row.front}" data-after="${id}" type="button" title="Adicionar outra pessoa com este cargo nesta frente" aria-label="Adicionar outro">+</button><button class="ico del" data-del="${id}" type="button" title="Remover esta linha" aria-label="Remover linha">×</button></span></div>
+        <input class="nmin" data-name="${id}" type="text" value="${esc(row.name||"")}" placeholder="nome (opcional)" aria-label="Nome para ${esc(rowLabel(row))}"></td>
       ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}" data-r="${id}" data-i="${i}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" ${S.selMode?"readonly":""} aria-label="${esc(rowLabel(row))} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
-      <td class="n" id="th_${id}"></td><td class="n" id="tv_${id}"></td></tr>`;
+      <td class="n" id="tv_${id}"></td><td class="n" id="th_${id}"></td></tr>`;
   };
   const body=S.fronts.map(f=>{
     const rs=frontRows(f.id);
@@ -1761,14 +1795,14 @@ function render(){
         <div class="fhd"><button type="button" class="ftog" data-ftog="${f.id}" aria-expanded="${!f.coll}" title="${f.coll?"Abrir":"Recolher"} frente">${f.coll?"▸":"▾"}</button><input class="fnm" data-fname="${f.id}" type="text" value="${esc(f.name)}" aria-label="Nome da frente"></div>
         <div class="rowacts"><div class="inp fadd"><select data-fadd="${f.id}" aria-label="Adicionar cargo à frente ${esc(f.name)}">${roleOpts}</select></div><button class="btn link danger" data-fdel="${f.id}" type="button">remover frente</button></div>
         <div class="lvl">${rs.length} ${rs.length===1?"recurso":"recursos"}</div></td>
-      ${COLS.map((c,i)=>`<td class="n fsub ${c.fmax>1?"imadj":""}"><div id="fh_${f.id}_${i}"></div><div class="mv" id="fv_${f.id}_${i}"></div></td>`).join("")}
-      <td class="n" id="fth_${f.id}"></td><td class="n" id="ftv_${f.id}"></td></tr>`;
+      ${COLS.map((c,i)=>`<td class="n fsub ${c.fmax>1?"imadj":""}"><div class="mv" id="fv_${f.id}_${i}"></div><div class="mh" id="fh_${f.id}_${i}"></div></td>`).join("")}
+      <td class="n" id="ftv_${f.id}"></td><td class="n" id="fth_${f.id}"></td></tr>`;
     if(f.coll) return head;
     const inner = rs.length ? rs.map(roleRow).join("") : `<tr class="rrow"><td class="stk"><span class="muted">Use <b>+ Adicionar cargo</b> para montar esta frente.</span></td><td colspan="${COLS.length+2}"></td></tr>`;
     return head+inner;
   }).join("");
   const emptyMsg = !S.fronts.length ? `<tr><td class="stk"><span class="muted">Crie uma frente com <b>+ Nova frente</b>.</span></td><td colspan="${COLS.length+2}"></td></tr>` : "";
-  const foot=`<tr class="tot"><td class="stk">Total do projeto</td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div id="ch_${i}"></div><div class="mv" id="cv_${i}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
+  const foot=`<tr class="tot"><td class="stk">Total do projeto</td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div class="mv" id="cv_${i}"></div><div class="mh" id="ch_${i}"></div></td>`).join("")}<td class="n tv" id="imcTV"></td><td class="n" id="imcTH"></td></tr>`;
   g("imcTbl").innerHTML=head+`<tbody>${body}${emptyMsg}${foot}</tbody>`;
   g("imcTbl").classList.toggle("selmode",!!S.selMode);
   for(const k of [...SEL]){ const [r,i]=k.split("|"); if(!VROWS.includes(r) || +i>=COLS.length) SEL.delete(k); }
@@ -1777,12 +1811,12 @@ function render(){
 }
 function renderScales(){
   const g=id=>document.getElementById(id), ae=document.activeElement;
-  const changed=ROLES.filter(([id])=>scaleOf(id)!==DEFSC[id]).length;
-  g("imcScNote").textContent = changed ? `· ${changed} ${changed===1?"cargo alterado":"cargos alterados"}` : "· padrão Advisory/CMG";
+  const changed=ROLES.filter(([id])=>scaleOf(id)!==DEFSC[id]).length + Object.keys(S.reajY||{}).filter(y=>S.reajY[y]!==S.reaj).length;
+  g("imcScNote").textContent = changed ? `· ${changed} ${changed===1?"alteração":"alterações"}` : "· padrão Advisory/CMG";
   if(ae && ae.closest && ae.closest("#imcScTbl")) return;
   const M=months(); const yrs=[...new Set(M.map(o=>o.y))];
   const steps=[]; const seen=new Set(); for(const o of M){ const c=cycles(o.y,o.m); if(!seen.has(c)){ seen.add(c); steps.push(o); } }
-  g("imcScTbl").innerHTML=`<thead><tr><th>Cargo</th><th class="n">Scale base (abr/26)</th><th class="n">Padrão</th>${steps.filter(o=>cycles(o.y,o.m)>0).map(o=>`<th class="n">a partir de ${mlabel(o.y,o.m)}</th>`).join("")}</tr></thead><tbody>
+  g("imcScTbl").innerHTML=`<thead><tr><th>Cargo</th><th class="n">Scale base (abr/26)</th><th class="n">Padrão</th>${steps.filter(o=>cycles(o.y,o.m)>0).map(o=>{ const yr=2026+cycles(o.y,o.m); return `<th class="n">a partir de abr/${String(yr).slice(2)}<div class="inp ryinp"><span>+</span><input data-ry="${yr}" type="text" inputmode="decimal" value="${NF(2).format(reajOf(yr))}" aria-label="Reajuste de abril de ${yr}"><span>%</span></div></th>`; }).join("")}</tr></thead><tbody>
     ${ROLES.map(([id,nm])=>{ const v=scaleOf(id), dif=v!==DEFSC[id]; return `<tr class="${dif?"scdif":""}"><td><div class="who">${esc(nm)}</div></td>
       <td class="n"><div class="inp scinp"><span>R$</span><input data-sc="${id}" type="text" inputmode="decimal" value="${NF(2).format(v)}" aria-label="Scale base de ${esc(nm)}"></div></td>
       <td class="n muted">${NF(0).format(DEFSC[id])}${dif?` <button class="btn link" data-scr="${id}" type="button">usar</button>`:""}</td>
@@ -1826,10 +1860,13 @@ function recalc(){
   // resumo por cargo
   const cap100=c=> c.t==="w" ? c.days.length*S.hd : (c.t==="y" ? c.months.reduce((a,o)=>a+hoursMonth(o),0) : hoursMonth(c));
   const capRow=C.cols.reduce((a,c)=>a+cap100(c),0);
-  const byRole=ROLES.map(([rid,nm])=>{ const sc=scaleOf(rid); const rs=S.rows.filter(r=>r.role===rid).map(r=>C.rows[r.id]).filter(x=>x.h>0); const h=rs.reduce((a,x)=>a+x.h,0), vl=rs.reduce((a,x)=>a+x.vl,0); return {nm,sc,n:rs.length,h,vl,alloc: rs.length&&capRow? h/(rs.length*capRow):0}; }).filter(x=>x.n>0);
+  const byRole=ROLES.map(([rid,nm])=>{ const sc=scaleOf(rid); const rs=S.rows.filter(r=>r.role===rid).map(r=>C.rows[r.id]).filter(x=>x.h>0); const h=rs.reduce((a,x)=>a+x.h,0), vl=rs.reduce((a,x)=>a+x.vl,0); return {nm,sc,rs,n:rs.length,h,vl,alloc: rs.length&&capRow? h/(rs.length*capRow):0}; }).filter(x=>x.n>0);
   const nRec=byRole.reduce((a,x)=>a+x.n,0);
-  g("imcRoles").innerHTML = byRole.length ? `<table><thead><tr><th>Cargo</th><th class="n">Recursos</th><th class="n">Alocação média</th><th class="n">Horas</th><th class="n">Horas/mês</th><th class="n">Valor líquido</th><th class="n">Valor/mês</th><th class="n">% do valor</th></tr></thead><tbody>
-    ${byRole.map(x=>`<tr><td><div class="who">${esc(x.nm)}</div><div class="lvl">R$ ${NF(0).format(x.sc)}/h base</div></td><td class="n">${x.n}</td><td class="n">${NF(1).format(x.alloc*100)}%</td><td class="n">${fh(x.h)}</td><td class="n">${fh(x.h/Math.max(1,S.n))}</td><td class="n">${BRL.format(x.vl)}</td><td class="n">${BRL.format(x.vl/Math.max(1,S.n))}</td><td class="n">${C.VL>0?NF(1).format(x.vl/C.VL*100):"0"}%</td></tr>`).join("")}
+  const fname=id=>{ const f=S.fronts.find(x=>x.id===id); return f ? (f.name||"Frente") : ""; };
+  const line=(cls,label,sub,n,alloc,h,vl)=>`<tr class="${cls}"><td><div class="who">${label}</div>${sub?`<div class="lvl">${sub}</div>`:""}</td><td class="n">${n}</td><td class="n">${NF(1).format(alloc*100)}%</td><td class="n">${fh(h)}</td><td class="n">${fh(h/Math.max(1,S.n))}</td><td class="n">${BRL.format(vl)}</td><td class="n">${BRL.format(vl/Math.max(1,S.n))}</td><td class="n">${C.VL>0?NF(1).format(vl/C.VL*100):"0"}%</td></tr>`;
+  g("imcRoles").innerHTML = byRole.length ? `<table><thead><tr><th>Cargo / recurso</th><th class="n">Recursos</th><th class="n">Alocação média</th><th class="n">Horas</th><th class="n">Horas/mês</th><th class="n">Valor líquido</th><th class="n">Valor/mês</th><th class="n">% do valor</th></tr></thead><tbody>
+    ${byRole.map(x=> line("rgrp", esc(x.nm), "", x.n, x.alloc, x.h, x.vl)
+      + x.rs.map(r=> line("rres", esc(r.row.name ? r.row.name : rowLabel(r.row)), esc(fname(r.row.front)), "", capRow? r.h/capRow:0, r.h, r.vl)).join("")).join("")}
     <tr class="tot"><td>Total</td><td class="n">${nRec}</td><td class="n">${nRec&&capRow?NF(1).format(C.H/(nRec*capRow)*100):"0"}%</td><td class="n">${fh(C.H)}</td><td class="n">${fh(C.H/Math.max(1,S.n))}</td><td class="n">${BRL.format(C.VL)}</td><td class="n">${BRL.format(C.VL/Math.max(1,S.n))}</td><td class="n">100%</td></tr></tbody></table>`
     : `<p class="muted" style="margin:0">Preencha a alocação na tabela para ver o resumo por cargo.</p>`;
   return C;
@@ -1866,7 +1903,7 @@ function summaryText(){
     L.push(`${f.name||"Frente"} — ${NF(1).format(fh2)} h · ${BRL.format(fv)}`);
     for(const x of rs) L.push(`  • ${rowLabel(x.row)}${x.row.name?` (${x.row.name})`:""} — R$ ${NF(0).format(x.sc)}/h base: ${NF(1).format(x.h)} h · ${BRL.format(x.vl)}`);
     L.push(""); }
-  if(L[L.length-1]!=="") L.push(""); L.push(`Total: ${NF(1).format(C.H)} h`, `Valor líquido por mês: ${BRL.format(C.VL/Math.max(1,S.n))}`, `Valor bruto: ${BRL.format(C.Vb)}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
+  if(L[L.length-1]!=="") L.push(""); L.push(`Total: ${NF(1).format(C.H)} h`, `Valor líquido por mês: ${BRL.format(C.VL/Math.max(1,S.n))}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
   return L.join("\n");
 }
 function msg(t){ const m=document.getElementById("imcMsg"); m.textContent=t; clearTimeout(msg.t); msg.t=setTimeout(()=>{m.textContent="";},6000); }
@@ -1934,15 +1971,19 @@ function bind(){
     if(t && t.id==="imcSelVal") return;
     if(e.key==="Escape"){ SEL.clear(); anchor=null; paintSel(); }
     else if((e.key==="Delete"||e.key==="Backspace") && (!t.classList||!t.classList.contains("pin")||SEL.size>1)){ e.preventDefault(); applySel(""); }
-    else if(/^[0-9]$/.test(e.key) && SEL.size>1){ e.preventDefault(); const v=g("imcSelVal"); v.value=e.key; v.focus(); }
+    else if(/^[0-9]$/.test(e.key) && SEL.size>1){ e.preventDefault(); const v=g("imcSelVal"); v.value=e.key; v.focus({preventScroll:true}); }
   });
   const scT=g("imcScTbl");
   scT.addEventListener("change",e=>{ const el=e.target.closest("input[data-sc]"); if(!el) return; const v=parseMoney(el.value);
     if(v==null || v<=0){ msg("Digite um valor por hora maior que zero."); renderScales(); return; }
     S.scales[el.dataset.sc]=v; save(); el.blur(); render(); msg(`Scale de ${ROLE[el.dataset.sc].nm} salvo: R$ ${NF(2).format(v)}/h.`); });
+  scT.addEventListener("change",e=>{ const el=e.target.closest("input[data-ry]"); if(!el) return; const v=parseNum(el.value);
+    if(v==null || v<0){ msg("Digite um reajuste de 0% ou mais."); renderScales(); return; }
+    S.reajY[+el.dataset.ry]=v; save(); el.blur(); render(); msg(`Reajuste de abril/${el.dataset.ry}: ${NF(2).format(v)}%.`); });
+  scT.addEventListener("keydown",e=>{ if(e.key==="Enter" && e.target.matches("input[data-ry]")){ e.preventDefault(); e.target.dispatchEvent(new Event("change",{bubbles:true})); } });
   scT.addEventListener("keydown",e=>{ if(e.key==="Enter" && e.target.matches("input[data-sc]")){ e.preventDefault(); e.target.dispatchEvent(new Event("change",{bubbles:true})); } });
   scT.addEventListener("click",e=>{ const b=e.target.closest("button[data-scr]"); if(!b) return; delete S.scales[b.dataset.scr]; save(); render(); });
-  g("imcScReset").addEventListener("click",e=>{ const b=e.target; if(b.dataset.confirm){ S.scales={}; save(); render(); msg("Scales padrão restaurados."); delete b.dataset.confirm; b.textContent="Restaurar scales padrão"; return; }
+  g("imcScReset").addEventListener("click",e=>{ const b=e.target; if(b.dataset.confirm){ S.scales={}; S.reajY={}; save(); render(); msg("Scales e reajustes padrão restaurados."); delete b.dataset.confirm; b.textContent="Restaurar scales padrão"; return; }
     b.dataset.confirm="1"; b.textContent="Confirmar restauração"; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.confirm; b.textContent="Restaurar scales padrão"; } },4000); });
   const tbl=g("imcTbl");
   // arrastar com o mouse para selecionar um bloco; Shift+clique estende
@@ -1958,14 +1999,14 @@ function bind(){
     if(drag===1){ drag=2; tbl.classList.add("dragging"); if(document.activeElement && document.activeElement.blur) document.activeElement.blur(); }
     rect(anchor,c);
   });
-  document.addEventListener("pointerup",()=>{ if(drag===2){ const v=g("imcSelVal"); v.value=""; setTimeout(()=>v.focus(),0); } drag=0; tbl.classList.remove("dragging"); });
+  document.addEventListener("pointerup",()=>{ if(drag===2){ const v=g("imcSelVal"); v.value=""; setTimeout(()=>v.focus({preventScroll:true}),0); } drag=0; tbl.classList.remove("dragging"); });
   tbl.addEventListener("click",e=>{
     if(S.selMode){ const c=cellOf(e.target); if(c){ if(!anchor){ anchor=c; SEL.clear(); SEL.add(ck(c.r,c.i)); paintSel(); } else { rect(anchor,c); anchor=null; } return; } }
     const y=e.target.closest("button.ytog"); if(y){ const yy=+y.dataset.y; S.coll[yy]=!isColl(yy); SEL.clear(); save(); render(); return; }
     const ft=e.target.closest("button[data-ftog]"); if(ft){ const f=S.fronts.find(x=>x.id===ft.dataset.ftog); f.coll=!f.coll; SEL.clear(); save(); render(); return; }
     const fd=e.target.closest("button[data-fdel]"); if(fd){ const fid=fd.dataset.fdel; if(fd.dataset.confirm){ for(const r of frontRows(fid)){ delete S.alloc[r.id]; delete S.allocW[r.id]; } S.rows=S.rows.filter(r=>r.front!==fid); S.fronts=S.fronts.filter(f=>f.id!==fid); SEL.clear(); save(); render(); } else { fd.dataset.confirm="1"; fd.textContent="confirmar remoção"; setTimeout(()=>{ if(fd.isConnected){ delete fd.dataset.confirm; fd.textContent="remover frente"; } },4000); } return; }
     const add=e.target.closest("button[data-add]"); if(add){ const role=add.dataset.add, front=add.dataset.front; const id=uid(role); const after=S.rows.findIndex(r=>r.id===add.dataset.after); S.rows.splice(after+1,0,{id,role,front,name:""}); S.sel[id]=true; save(); render(); const nm=tbl.querySelector(`input[data-name="${id}"]`); if(nm) nm.focus(); return; }
-    const del=e.target.closest("button[data-del]"); if(del){ const id=del.dataset.del; if(del.dataset.confirm){ S.rows=S.rows.filter(r=>r.id!==id); delete S.alloc[id]; delete S.allocW[id]; delete S.sel[id]; SEL.clear(); save(); render(); } else { del.dataset.confirm="1"; del.textContent="confirmar"; setTimeout(()=>{ if(del.isConnected){ delete del.dataset.confirm; del.textContent="remover"; } },4000); } return; }
+    const del=e.target.closest("button[data-del]"); if(del){ const id=del.dataset.del; if(del.dataset.confirm){ S.rows=S.rows.filter(r=>r.id!==id); delete S.alloc[id]; delete S.allocW[id]; delete S.sel[id]; SEL.clear(); save(); render(); } else { del.dataset.confirm="1"; del.textContent="ok?"; del.classList.add("on"); setTimeout(()=>{ if(del.isConnected){ delete del.dataset.confirm; del.textContent="×"; del.classList.remove("on"); } },4000); } return; }
     const b=e.target.closest("button[data-rep]"); if(b){
       const r=b.dataset.rep; let last=null, filled=0;
       for(const c of COLS){ const cv=getCell(r,c); if(cv.mixed){ last=null; continue; } if(cv.v!==""){ last=cv.v; continue; } if(last!=null){ setCell(r,c,last); filled++; } }
