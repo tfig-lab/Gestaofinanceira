@@ -96,6 +96,7 @@ th.hl,td.hl{background:var(--soft)}
 .port td:first-child{min-width:240px}
 .port .pn{font-weight:700}
 .port .pc{font-size:.76rem;color:var(--muted)}
+.port .pc.eng{font-variant-numeric:tabular-nums;letter-spacing:.02em}
 .port .barcell{width:16%;min-width:150px}
 .minirow{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--muted)}
 .minirow .mini{flex:1}
@@ -759,7 +760,7 @@ function renderPortfolio(engs){
   $("tabs").innerHTML = rows.map(({e,c,st})=>{
     const used = c.valor>0 ? c.consumo/c.valor : null;
     return `<tr data-eng="${esc(e)}" class="${e===state.sel?"sel":""}" tabindex="0" aria-selected="${e===state.sel}">
-      <td><div class="pn">${esc(c.ds.desc||e)}</div><div class="pc">${esc(titleCase(c.ds.client))}</div></td>
+      <td><div class="pn">${esc(c.ds.desc||e)}</div><div class="pc">${esc(titleCase(c.ds.client))}</div><div class="pc eng">Eng. ${esc(e)}</div></td>
       <td class="n">${c.s.real==null?"—":N1.format(c.s.real)+"%"}</td>
       <td class="n">${c.s.real==null?"—":money(c.F.receita)}</td>
       <td class="n">${money(c.valor)}</td>
