@@ -1598,7 +1598,7 @@ const MARKUP = `
       <div class="field f-real" id="imcHmBox"><label for="imcHm">Horas/mês (100%)</label><div class="inp"><input id="imcHm" type="text" inputmode="decimal"><span>h</span></div></div>
       <div class="field" style="width:auto"><label>Ver por</label><div class="seg" role="group" aria-label="Visão da tabela"><button id="imcVS" type="button">Semana</button><button id="imcVM" type="button">Mês</button><button id="imcVA" type="button">Ano</button></div></div>
     </div>
-    <div class="proj-foot"><span id="imcHint"></span><span class="imc-actions"><label class="check" style="padding:0"><input type="checkbox" id="imcOnly"><span>Mostrar só linhas selecionadas</span></label><button class="btn link danger" id="imcClear" type="button">Limpar tabela</button><button class="btn" id="imcCopy" type="button">Copiar resumo</button><button class="btn" id="imcDl" type="button">Baixar esta aba</button></span></div>
+    <div class="proj-foot"><span id="imcHint"></span><span class="imc-actions"><button class="btn link danger" id="imcClear" type="button">Limpar tabela</button><button class="btn" id="imcCopy" type="button">Copiar resumo</button><button class="btn" id="imcDl" type="button">Baixar esta aba</button></span></div>
   </section>
 
   <section class="c12 imc-sum" aria-label="Resumo do orçamento">
@@ -1613,7 +1613,7 @@ const MARKUP = `
 
   <section class="card c12" aria-label="Alocação por cargo">
     <div class="card-hd"><h3 id="imcTitle">Alocação por cargo e mês</h3>
-      <span class="imc-actions"><span class="sub" id="imcPeriod"></span><button class="btn" id="imcSelMode" type="button" aria-pressed="false">Selecionar células</button></span></div>
+      <span class="imc-actions"><span class="sub" id="imcPeriod"></span><div class="seg" role="group" aria-label="Linhas da tabela"><button id="imcAll" type="button">Todos os cargos</button><button id="imcOnly" type="button">Só do projeto</button></div><div class="inp" id="imcAddBox" hidden><select id="imcAdd" aria-label="Adicionar cargo ao projeto"></select></div><button class="btn" id="imcSelMode" type="button" aria-pressed="false">Selecionar células</button></span></div>
     <div class="selbar" id="imcSelBar" hidden>
       <b id="imcSelN"></b>
       <div class="inp" style="width:110px"><input id="imcSelVal" type="text" inputmode="decimal" placeholder="%" aria-label="Valor para as células selecionadas"><span>%</span></div>
@@ -1656,7 +1656,9 @@ function render(){
   g("imcVA").setAttribute("aria-pressed",String(S.view==="mes" && allC));
   g("imcHmBox").hidden = S.base!=="fixo" || S.view==="semana";
   g("imcHdBox").hidden = S.base==="fixo" && S.view!=="semana";
-  g("imcOnly").checked=!!S.onlySel;
+  g("imcAll").setAttribute("aria-pressed",String(!S.onlySel)); g("imcOnly").setAttribute("aria-pressed",String(!!S.onlySel));
+  g("imcAddBox").hidden=!S.onlySel;
+  g("imcAdd").innerHTML=`<option value="">+ Adicionar cargo</option>`+ROLES.map(([id,nm])=>`<option value="${id}">${esc(nm)}</option>`).join("");
   g("imcSelMode").setAttribute("aria-pressed",String(!!S.selMode));
   g("imcPeriod").textContent=`${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} · ${M.length} ${M.length===1?"mês":"meses"}`;
   g("imcTitle").textContent= S.view==="semana" ? "Alocação por cargo e semana" : "Alocação por cargo e mês";
@@ -1687,8 +1689,9 @@ function render(){
       ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}" data-r="${id}" data-i="${i}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" ${S.selMode?"readonly":""} aria-label="${esc(rowLabel(row))} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
       <td class="n" id="th_${id}"></td><td class="n" id="tv_${id}"></td></tr>`;
   }).join("");
+  const emptyMsg = S.onlySel && !VROWS.length ? `<tr><td class="stk" colspan="2"><span class="muted">Nenhum cargo no projeto. Use <b>+ Adicionar cargo</b> acima.</span></td><td colspan="${COLS.length+2}"></td></tr>` : "";
   const foot=`<tr class="tot"><td class="stk">Total</td><td></td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div id="ch_${i}"></div><div class="mv" id="cv_${i}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
-  g("imcTbl").innerHTML=head+`<tbody>${body}${foot}</tbody>`;
+  g("imcTbl").innerHTML=head+`<tbody>${body}${emptyMsg}${foot}</tbody>`;
   g("imcTbl").classList.toggle("selmode",!!S.selMode);
   for(const k of [...SEL]){ const [r,i]=k.split("|"); if(!VROWS.includes(r) || +i>=COLS.length) SEL.delete(k); }
   paintSel(); recalc();
@@ -1806,7 +1809,12 @@ function bind(){
   g("imcVS").addEventListener("click",()=>setView("semana"));
   g("imcVM").addEventListener("click",()=>setView("mes",false));
   g("imcVA").addEventListener("click",()=>setView("mes",true));
-  g("imcOnly").addEventListener("change",e=>{ S.onlySel=e.target.checked; save(); render(); });
+  g("imcAll").addEventListener("click",()=>{ S.onlySel=false; save(); render(); });
+  g("imcOnly").addEventListener("click",()=>{ S.onlySel=true; save(); render(); if(!S.rows.some(r=>S.sel[r.id])) msg("Nenhum cargo no projeto ainda. Use + Adicionar cargo."); });
+  g("imcAdd").addEventListener("change",e=>{ const role=e.target.value; if(!role) return;
+    let row=S.rows.find(r=>r.role===role && !S.sel[r.id]);
+    if(!row){ const last=[...S.rows].reverse().find(r=>r.role===role); row={id:uid(role),role,name:""}; S.rows.splice(S.rows.indexOf(last)+1,0,row); }
+    S.sel[row.id]=true; save(); render(); const inp=document.querySelector(`input.pin[data-r="${row.id}"]`); if(inp) inp.focus(); });
   g("imcSelMode").addEventListener("click",()=>{ S.selMode=!S.selMode; anchor=null; save(); render(); if(S.selMode) msg("Toque na primeira e depois na última célula do bloco."); });
   g("imcClear").addEventListener("click",e=>{
     const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.allocW={}; S.sel={}; SEL.clear(); save(); render(); msg("Tabela limpa."); return; }
