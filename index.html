@@ -242,6 +242,16 @@ table.imc td.imsel{background:color-mix(in srgb, var(--accent) 16%, var(--card))
 table.imc.dragging,table.imc.dragging *{user-select:none;cursor:cell}
 table.imc.selmode td.cell{cursor:pointer}
 table.imc.selmode .pin{pointer-events:none}
+table.imc tr.fgrp td{background:var(--soft);border-top:2px solid var(--rule);font-weight:600}
+table.imc tr.fgrp td.stk{background:color-mix(in srgb, var(--soft) 100%, var(--card))}
+table.imc tr.fgrp td.fsub{font-size:.8rem}
+.fhd{display:flex;align-items:center;gap:4px}
+.ftog{border:0;background:none;cursor:pointer;font-size:.85rem;color:var(--ink);padding:2px 4px}
+.fnm{border:0;border-bottom:1px dashed transparent;background:transparent;font:inherit;font-weight:700;font-size:.98rem;color:var(--ink);width:100%;max-width:170px;padding:2px 0}
+.fnm:hover,.fnm:focus{border-bottom-color:var(--accent);outline:none}
+.fadd{margin:4px 0}
+.fadd select{font-size:.78rem;padding:3px 6px}
+#imcNewFront{white-space:nowrap}
 .selbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;border:1px solid var(--accent);border-radius:4px;background:var(--soft);position:sticky;left:0}
 #imcSelMode[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
 
@@ -1500,11 +1510,18 @@ function load(){
   if(S.view==="ano"){ S.view="mes"; S.allYears=true; }
   if(!Array.isArray(S.rows) || !S.rows.length) S.rows=ROLES.map(([id])=>({id, role:id, name:""}));
   S.rows=S.rows.filter(r=>ROLE[r.role]);
-  for(const [id] of ROLES) if(!S.rows.some(r=>r.role===id)) S.rows.push({id:uid(id), role:id, name:""});
+  if(!Array.isArray(S.fronts) || !S.fronts.length){
+    const keep=S.rows.filter(r=>S.sel[r.id]);
+    S.fronts=[{id:"f1", name: keep.length ? "Geral" : "Frente 1"}];
+    S.rows=keep.map(r=>({...r, front:"f1"}));
+  }
+  const fids=new Set(S.fronts.map(f=>f.id));
+  for(const r of S.rows) if(!fids.has(r.front)) r.front=S.fronts[0].id;
   sortRows();
 }
-function uid(role){ let i=2; while(S && S.rows && S.rows.some(r=>r.id===`${role}_${i}`)) i++; return `${role}_${i}`; }
-function sortRows(){ const ord=Object.fromEntries(ROLES.map(([id],i)=>[id,i])); S.rows.sort((a,b)=>ord[a.role]-ord[b.role] || (S.rows.indexOf(a)-S.rows.indexOf(b))); }
+function uid(role){ let i=1; const ex=id=>S && S.rows && S.rows.some(r=>r.id===id); if(!ex(role)) return role; i=2; while(ex(`${role}_${i}`)) i++; return `${role}_${i}`; }
+function sortRows(){ const ord=Object.fromEntries(ROLES.map(([id],i)=>[id,i])); const fo=Object.fromEntries((S.fronts||[]).map((f,i)=>[f.id,i])); const pos=new Map(S.rows.map((r,i)=>[r,i])); S.rows.sort((a,b)=>(fo[a.front]-fo[b.front]) || (ord[a.role]-ord[b.role]) || (pos.get(a)-pos.get(b))); }
+const frontRows=fid=>S.rows.filter(r=>r.front===fid);
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
 const fim=()=>addMonths(S.ini,S.n-1);
 function months(){ const out=[]; for(let i=0;i<S.n;i++){ const k=addMonths(S.ini,i); const [y,m]=k.split("-").map(Number); out.push({k,y,m,bd:bizDaysMonth(y,m)}); } return out; }
@@ -1553,7 +1570,6 @@ function setCell(r,c,v){
   for(const k of ks){ if(v==="") delete S.alloc[r][k]; else S.alloc[r][k]=v; }
 }
 function cellCalc(r,sc,c){
-  if(!S.sel[r]) return {h:0,vb:0};
   if(c.t==="w"){ const p=pnum(raw(S.allocW,r,c.k))/100; let h=0,vb=0; for(const d of c.days){ const hh=S.hd*p; h+=hh; vb+=hh*sc*factor(d.y,d.m); } return {h,vb}; }
   const ms = c.t==="y" ? c.months : [c];
   let h=0,vb=0; for(const o of ms){ const hh=hoursMonth(o)*pnum(raw(S.alloc,r,o.k))/100; h+=hh; vb+=hh*sc*factor(o.y,o.m); } return {h,vb};
@@ -1572,7 +1588,7 @@ function seedOnSwitch(to){
 }
 const chip=c=> c.fmax>1 ? `<br><span class="adjc">+${NF(2).format((c.fmax-1)*100)}%${c.fmin!==c.fmax?" parcial":""}</span>` : "";
 function rowLabel(row){
-  const same=S.rows.filter(r=>r.role===row.role); const n=same.indexOf(row)+1;
+  const same=S.rows.filter(r=>r.role===row.role && r.front===row.front); const n=same.indexOf(row)+1;
   return ROLE[row.role].nm + (same.length>1 ? ` ${n}` : "");
 }
 
@@ -1613,7 +1629,7 @@ const MARKUP = `
 
   <section class="card c12" aria-label="Alocação por cargo">
     <div class="card-hd"><h3 id="imcTitle">Alocação por cargo e mês</h3>
-      <span class="imc-actions"><span class="sub" id="imcPeriod"></span><div class="seg" role="group" aria-label="Linhas da tabela"><button id="imcAll" type="button">Todos os cargos</button><button id="imcOnly" type="button">Só do projeto</button></div><div class="inp" id="imcAddBox" hidden><select id="imcAdd" aria-label="Adicionar cargo ao projeto"></select></div><button class="btn" id="imcSelMode" type="button" aria-pressed="false">Selecionar células</button></span></div>
+      <span class="imc-actions"><span class="sub" id="imcPeriod"></span><button class="btn primary" id="imcNewFront" type="button">+ Nova frente</button><button class="btn" id="imcSelMode" type="button" aria-pressed="false">Selecionar células</button></span></div>
     <div class="selbar" id="imcSelBar" hidden>
       <b id="imcSelN"></b>
       <div class="inp" style="width:110px"><input id="imcSelVal" type="text" inputmode="decimal" placeholder="%" aria-label="Valor para as células selecionadas"><span>%</span></div>
@@ -1625,8 +1641,10 @@ const MARKUP = `
     <div class="tbl imc-scroll"><table class="imc" id="imcTbl"></table></div>
   </section>
 
-  <section class="card c12" aria-label="Resumo por cargo">
-    <div class="card-hd"><h3>Resumo por cargo</h3><span class="sub">Alocação média = horas ÷ horas disponíveis dos recursos no período</span></div>
+  <section class="card c12" aria-label="Resumo por frente e cargo">
+    <div class="card-hd"><h3>Resumo por frente</h3></div>
+    <div class="tbl" id="imcFronts"></div>
+    <div class="card-hd" style="margin-top:8px"><h3>Resumo por cargo</h3><span class="sub">Alocação média = horas ÷ horas disponíveis dos recursos no período</span></div>
     <div class="tbl" id="imcRoles"></div>
   </section>
   <p class="source c12" id="imcMsg" role="status"></p>
@@ -1656,12 +1674,9 @@ function render(){
   g("imcVA").setAttribute("aria-pressed",String(S.view==="mes" && allC));
   g("imcHmBox").hidden = S.base!=="fixo" || S.view==="semana";
   g("imcHdBox").hidden = S.base==="fixo" && S.view!=="semana";
-  g("imcAll").setAttribute("aria-pressed",String(!S.onlySel)); g("imcOnly").setAttribute("aria-pressed",String(!!S.onlySel));
-  g("imcAddBox").hidden=!S.onlySel;
-  g("imcAdd").innerHTML=`<option value="">+ Adicionar cargo</option>`+ROLES.map(([id,nm])=>`<option value="${id}">${esc(nm)}</option>`).join("");
   g("imcSelMode").setAttribute("aria-pressed",String(!!S.selMode));
   g("imcPeriod").textContent=`${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} · ${M.length} ${M.length===1?"mês":"meses"}`;
-  g("imcTitle").textContent= S.view==="semana" ? "Alocação por cargo e semana" : "Alocação por cargo e mês";
+  g("imcTitle").textContent= S.view==="semana" ? "Alocação por frente e semana" : "Alocação por frente e mês";
   g("imcHint").textContent = (S.view==="semana"
     ? `Cada semana usa os dias úteis dela × ${NF(1).format(S.hd)} h. A visão por semana tem alocação própria; ao trocar, os % são copiados se a outra visão estiver vazia.`
     : (S.base==="fixo" ? `Cada mês tem ${NF(1).format(S.hm)} h a 100%.` : `Horas do mês = dias úteis (sem feriados nacionais) × ${NF(1).format(S.hd)} h.`) + " Clique no ano para recolher ou abrir os meses.")
@@ -1669,28 +1684,38 @@ function render(){
   // cabeçalho: faixa de anos (com recolher/abrir) + colunas
   let yearRow="";
   if(S.view==="mes"){
-    yearRow=`<tr class="yrow"><th class="stk" rowspan="2">Cargo</th><th class="n" rowspan="2">No projeto</th>${YS.map(y=>{ const span=COLS.filter(c=>c.y===y).length; return `<th colspan="${span}" class="ygrp"><button type="button" class="ytog" data-y="${y}" aria-expanded="${!isColl(y)}">${isColl(y)?"▸":"▾"} ${y}</button></th>`; }).join("")}<th class="n" rowspan="2">Total h</th><th class="n" rowspan="2">Valor líquido</th></tr>`;
+    yearRow=`<tr class="yrow"><th class="stk" rowspan="2">Frente / cargo</th>${YS.map(y=>{ const span=COLS.filter(c=>c.y===y).length; return `<th colspan="${span}" class="ygrp"><button type="button" class="ytog" data-y="${y}" aria-expanded="${!isColl(y)}">${isColl(y)?"▸":"▾"} ${y}</button></th>`; }).join("")}<th class="n" rowspan="2">Total h</th><th class="n" rowspan="2">Valor líquido</th></tr>`;
   }
   const colHead=COLS.map(c=>`<th class="n ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}">${esc(c.label)}<br><span class="bdays">${esc(c.sub)}</span>${chip(c)}</th>`).join("");
   const head = S.view==="mes"
     ? `<thead>${yearRow}<tr>${colHead}</tr></thead>`
-    : `<thead><tr><th class="stk">Cargo</th><th class="n">No projeto</th>${colHead}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
+    : `<thead><tr><th class="stk">Frente / cargo</th>${colHead}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
   VROWS=[];
-  const body=S.rows.map(row=>{
-    const id=row.id, R=ROLE[row.role], on=!!S.sel[id];
-    if(S.onlySel && !on) return "";
+  const roleOpts=`<option value="">+ Adicionar cargo</option>`+ROLES.map(([id,nm,sc])=>`<option value="${id}">${esc(nm)} · R$ ${NF(0).format(sc)}/h</option>`).join("");
+  const roleRow=row=>{
+    const id=row.id, R=ROLE[row.role];
     VROWS.push(id);
-    const multi=S.rows.filter(r=>r.role===row.role).length>1;
-    return `<tr data-row="${id}" class="${on?"":"imoff"}"><td class="stk"><div class="who">${esc(rowLabel(row))}</div>
+    return `<tr data-row="${id}" class="rrow"><td class="stk"><div class="who">${esc(rowLabel(row))}</div>
         <input class="nmin" data-name="${id}" type="text" value="${esc(row.name||"")}" placeholder="nome (opcional)" aria-label="Nome para ${esc(rowLabel(row))}">
         <div class="lvl">R$ ${NF(0).format(R.sc)}/h base</div>
-        <div class="rowacts"><button class="btn link" data-rep="${id}" type="button" title="Preenche os vazios com o último % à esquerda">Repetir →</button><button class="btn link" data-add="${row.role}" type="button" title="Adicionar outra pessoa com este cargo">+ outro</button>${multi?`<button class="btn link danger" data-del="${id}" type="button" title="Remover esta linha">remover</button>`:""}</div></td>
-      <td class="n"><input type="checkbox" data-sel="${id}" ${on?"checked":""} aria-label="${esc(rowLabel(row))} entra no projeto"></td>
+        <div class="rowacts"><button class="btn link" data-rep="${id}" type="button" title="Preenche os vazios com o último % à esquerda">Repetir →</button><button class="btn link" data-add="${row.role}" data-front="${row.front}" data-after="${id}" type="button" title="Adicionar outra pessoa com este cargo nesta frente">+ outro</button><button class="btn link danger" data-del="${id}" type="button" title="Remover esta linha">remover</button></div></td>
       ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${c.fmax>1?"imadj":""} ${c.t==="y"?"ycol":""}" data-r="${id}" data-i="${i}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" ${S.selMode?"readonly":""} aria-label="${esc(rowLabel(row))} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
       <td class="n" id="th_${id}"></td><td class="n" id="tv_${id}"></td></tr>`;
+  };
+  const body=S.fronts.map(f=>{
+    const rs=frontRows(f.id);
+    const head=`<tr class="fgrp" data-front="${f.id}"><td class="stk">
+        <div class="fhd"><button type="button" class="ftog" data-ftog="${f.id}" aria-expanded="${!f.coll}" title="${f.coll?"Abrir":"Recolher"} frente">${f.coll?"▸":"▾"}</button><input class="fnm" data-fname="${f.id}" type="text" value="${esc(f.name)}" aria-label="Nome da frente"></div>
+        <div class="rowacts"><div class="inp fadd"><select data-fadd="${f.id}" aria-label="Adicionar cargo à frente ${esc(f.name)}">${roleOpts}</select></div><button class="btn link danger" data-fdel="${f.id}" type="button">remover frente</button></div>
+        <div class="lvl">${rs.length} ${rs.length===1?"recurso":"recursos"}</div></td>
+      ${COLS.map((c,i)=>`<td class="n fsub ${c.fmax>1?"imadj":""}"><div id="fh_${f.id}_${i}"></div><div class="mv" id="fv_${f.id}_${i}"></div></td>`).join("")}
+      <td class="n" id="fth_${f.id}"></td><td class="n" id="ftv_${f.id}"></td></tr>`;
+    if(f.coll) return head;
+    const inner = rs.length ? rs.map(roleRow).join("") : `<tr class="rrow"><td class="stk"><span class="muted">Use <b>+ Adicionar cargo</b> para montar esta frente.</span></td><td colspan="${COLS.length+2}"></td></tr>`;
+    return head+inner;
   }).join("");
-  const emptyMsg = S.onlySel && !VROWS.length ? `<tr><td class="stk" colspan="2"><span class="muted">Nenhum cargo no projeto. Use <b>+ Adicionar cargo</b> acima.</span></td><td colspan="${COLS.length+2}"></td></tr>` : "";
-  const foot=`<tr class="tot"><td class="stk">Total</td><td></td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div id="ch_${i}"></div><div class="mv" id="cv_${i}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
+  const emptyMsg = !S.fronts.length ? `<tr><td class="stk"><span class="muted">Crie uma frente com <b>+ Nova frente</b>.</span></td><td colspan="${COLS.length+2}"></td></tr>` : "";
+  const foot=`<tr class="tot"><td class="stk">Total do projeto</td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div id="ch_${i}"></div><div class="mv" id="cv_${i}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
   g("imcTbl").innerHTML=head+`<tbody>${body}${emptyMsg}${foot}</tbody>`;
   g("imcTbl").classList.toggle("selmode",!!S.selMode);
   for(const k of [...SEL]){ const [r,i]=k.split("|"); if(!VROWS.includes(r) || +i>=COLS.length) SEL.delete(k); }
@@ -1716,6 +1741,17 @@ function recalc(){
     if(tv) tv.innerHTML = r.vl>0 ? BRL.format(r.vl) : `<span class="zero">–</span>`;
   }
   C.cols.forEach((c,i)=>{ const a=g(`ch_${i}`), b=g(`cv_${i}`); if(a) a.textContent=fh(C.colH[i]); if(b) b.textContent=BRL.format(C.colV[i]); });
+  const Rz=S.real/100; const FT=[];
+  for(const f of S.fronts){
+    const rs=frontRows(f.id).map(r=>C.rows[r.id]); let fh2=0, fv=0;
+    C.cols.forEach((c,i)=>{ const h=rs.reduce((a,x)=>a+x.cells[i].h,0), v=rs.reduce((a,x)=>a+x.cells[i].vb,0)*Rz; fh2+=h; fv+=v;
+      const a=g(`fh_${f.id}_${i}`), b=g(`fv_${f.id}_${i}`); if(a) a.textContent=h>0?fh(h):""; if(b) b.textContent=v>0?BRL.format(v):""; });
+    const a=g(`fth_${f.id}`), b=g(`ftv_${f.id}`); if(a) a.innerHTML=`<b>${fh(fh2)}</b>`; if(b) b.innerHTML=`<b>${BRL.format(fv)}</b>`;
+    FT.push({f, n:rs.filter(x=>x.h>0).length, h:fh2, vl:fv});
+  }
+  g("imcFronts").innerHTML = S.fronts.length ? `<table><thead><tr><th>Frente</th><th class="n">Recursos</th><th class="n">Horas</th><th class="n">Horas/mês</th><th class="n">Valor líquido</th><th class="n">Valor/mês</th><th class="n">% do valor</th></tr></thead><tbody>
+    ${FT.map(x=>`<tr><td><div class="who">${esc(x.f.name||"Sem nome")}</div></td><td class="n">${x.n}</td><td class="n">${fh(x.h)}</td><td class="n">${fh(x.h/Math.max(1,S.n))}</td><td class="n">${BRL.format(x.vl)}</td><td class="n">${BRL.format(x.vl/Math.max(1,S.n))}</td><td class="n">${C.VL>0?NF(1).format(x.vl/C.VL*100):"0"}%</td></tr>`).join("")}
+    <tr class="tot"><td>Total</td><td class="n">${FT.reduce((a,x)=>a+x.n,0)}</td><td class="n">${fh(C.H)}</td><td class="n">${fh(C.H/Math.max(1,S.n))}</td><td class="n">${BRL.format(C.VL)}</td><td class="n">${BRL.format(C.VL/Math.max(1,S.n))}</td><td class="n">100%</td></tr></tbody></table>` : "";
   g("imcTH").textContent=fh(C.H); g("imcTV").textContent=BRL.format(C.VL);
   g("imcLiq").textContent=BRL.format(C.VL); g("imcH").textContent=fh(C.H); g("imcBruto").textContent=BRL.format(C.Vb);
   g("imcTaxa").textContent= C.H>0 ? `${BRL.format(C.VL/C.H)}/h` : "—";
@@ -1758,8 +1794,12 @@ function summaryText(){
   const base = (S.view==="semana"||S.base!=="fixo") ? `horas pelos dias úteis × ${NF(2).format(S.hd)} h/dia` : `${NF(2).format(S.hm)} h/mês a 100%`;
   const L=[`Orçamento Advisory/CMG — ${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} (${M.length} ${M.length===1?"mês":"meses"})`,
     `Realização ${NF(2).format(S.real)}% · ${base} · reajuste ${NF(2).format(S.reaj)}% a.a. em abril (scales base abr/2026)${S.view==="semana"?" · alocação por semana":""}`, ""];
-  for(const row of S.rows){ const r=C.rows[row.id]; if(r.h>0) L.push(`${rowLabel(row)}${row.name?` (${row.name})`:""} — R$ ${NF(0).format(r.sc)}/h base: ${NF(1).format(r.h)} h · ${BRL.format(r.vl)}`); }
-  L.push("", `Total: ${NF(1).format(C.H)} h`, `Valor líquido por mês: ${BRL.format(C.VL/Math.max(1,S.n))}`, `Valor bruto: ${BRL.format(C.Vb)}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
+  for(const f of S.fronts){ const rs=frontRows(f.id).map(r=>C.rows[r.id]).filter(x=>x.h>0); if(!rs.length) continue;
+    const fh2=rs.reduce((a,x)=>a+x.h,0), fv=rs.reduce((a,x)=>a+x.vl,0);
+    L.push(`${f.name||"Frente"} — ${NF(1).format(fh2)} h · ${BRL.format(fv)}`);
+    for(const x of rs) L.push(`  • ${rowLabel(x.row)}${x.row.name?` (${x.row.name})`:""} — R$ ${NF(0).format(x.sc)}/h base: ${NF(1).format(x.h)} h · ${BRL.format(x.vl)}`);
+    L.push(""); }
+  if(L[L.length-1]!=="") L.push(""); L.push(`Total: ${NF(1).format(C.H)} h`, `Valor líquido por mês: ${BRL.format(C.VL/Math.max(1,S.n))}`, `Valor bruto: ${BRL.format(C.Vb)}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
   return L.join("\n");
 }
 function msg(t){ const m=document.getElementById("imcMsg"); m.textContent=t; clearTimeout(msg.t); msg.t=setTimeout(()=>{m.textContent="";},6000); }
@@ -1809,15 +1849,10 @@ function bind(){
   g("imcVS").addEventListener("click",()=>setView("semana"));
   g("imcVM").addEventListener("click",()=>setView("mes",false));
   g("imcVA").addEventListener("click",()=>setView("mes",true));
-  g("imcAll").addEventListener("click",()=>{ S.onlySel=false; save(); render(); });
-  g("imcOnly").addEventListener("click",()=>{ S.onlySel=true; save(); render(); if(!S.rows.some(r=>S.sel[r.id])) msg("Nenhum cargo no projeto ainda. Use + Adicionar cargo."); });
-  g("imcAdd").addEventListener("change",e=>{ const role=e.target.value; if(!role) return;
-    let row=S.rows.find(r=>r.role===role && !S.sel[r.id]);
-    if(!row){ const last=[...S.rows].reverse().find(r=>r.role===role); row={id:uid(role),role,name:""}; S.rows.splice(S.rows.indexOf(last)+1,0,row); }
-    S.sel[row.id]=true; save(); render(); const inp=document.querySelector(`input.pin[data-r="${row.id}"]`); if(inp) inp.focus(); });
+  g("imcNewFront").addEventListener("click",()=>{ const id="f"+Date.now().toString(36); S.fronts.push({id, name:`Frente ${S.fronts.length+1}`}); save(); render(); const el=document.querySelector(`input[data-fname="${id}"]`); if(el){ el.focus(); el.select(); } });
   g("imcSelMode").addEventListener("click",()=>{ S.selMode=!S.selMode; anchor=null; save(); render(); if(S.selMode) msg("Toque na primeira e depois na última célula do bloco."); });
   g("imcClear").addEventListener("click",e=>{
-    const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.allocW={}; S.sel={}; SEL.clear(); save(); render(); msg("Tabela limpa."); return; }
+    const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.allocW={}; SEL.clear(); save(); render(); msg("Percentuais apagados. As frentes e os cargos continuam na tabela."); return; }
     b.dataset.confirm="1"; b.textContent="Confirmar limpeza"; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.confirm; b.textContent="Limpar tabela"; } },4000);
   });
   g("imcCopy").addEventListener("click",copySummary);
@@ -1852,8 +1887,10 @@ function bind(){
   tbl.addEventListener("click",e=>{
     if(S.selMode){ const c=cellOf(e.target); if(c){ if(!anchor){ anchor=c; SEL.clear(); SEL.add(ck(c.r,c.i)); paintSel(); } else { rect(anchor,c); anchor=null; } return; } }
     const y=e.target.closest("button.ytog"); if(y){ const yy=+y.dataset.y; S.coll[yy]=!isColl(yy); SEL.clear(); save(); render(); return; }
-    const add=e.target.closest("button[data-add]"); if(add){ const role=add.dataset.add; const id=uid(role); const last=[...S.rows].reverse().find(r=>r.role===role); S.rows.splice(S.rows.indexOf(last)+1,0,{id,role,name:""}); S.sel[id]=true; save(); render(); const nm=tbl.querySelector(`input[data-name="${id}"]`); if(nm) nm.focus(); return; }
-    const del=e.target.closest("button[data-del]"); if(del){ const id=del.dataset.del; if(del.dataset.confirm){ S.rows=S.rows.filter(r=>r.id!==id); delete S.alloc[id]; delete S.allocW[id]; delete S.sel[id]; save(); render(); } else { del.dataset.confirm="1"; del.textContent="confirmar"; setTimeout(()=>{ if(del.isConnected){ delete del.dataset.confirm; del.textContent="remover"; } },4000); } return; }
+    const ft=e.target.closest("button[data-ftog]"); if(ft){ const f=S.fronts.find(x=>x.id===ft.dataset.ftog); f.coll=!f.coll; SEL.clear(); save(); render(); return; }
+    const fd=e.target.closest("button[data-fdel]"); if(fd){ const fid=fd.dataset.fdel; if(fd.dataset.confirm){ for(const r of frontRows(fid)){ delete S.alloc[r.id]; delete S.allocW[r.id]; } S.rows=S.rows.filter(r=>r.front!==fid); S.fronts=S.fronts.filter(f=>f.id!==fid); SEL.clear(); save(); render(); } else { fd.dataset.confirm="1"; fd.textContent="confirmar remoção"; setTimeout(()=>{ if(fd.isConnected){ delete fd.dataset.confirm; fd.textContent="remover frente"; } },4000); } return; }
+    const add=e.target.closest("button[data-add]"); if(add){ const role=add.dataset.add, front=add.dataset.front; const id=uid(role); const after=S.rows.findIndex(r=>r.id===add.dataset.after); S.rows.splice(after+1,0,{id,role,front,name:""}); S.sel[id]=true; save(); render(); const nm=tbl.querySelector(`input[data-name="${id}"]`); if(nm) nm.focus(); return; }
+    const del=e.target.closest("button[data-del]"); if(del){ const id=del.dataset.del; if(del.dataset.confirm){ S.rows=S.rows.filter(r=>r.id!==id); delete S.alloc[id]; delete S.allocW[id]; delete S.sel[id]; SEL.clear(); save(); render(); } else { del.dataset.confirm="1"; del.textContent="confirmar"; setTimeout(()=>{ if(del.isConnected){ delete del.dataset.confirm; del.textContent="remover"; } },4000); } return; }
     const b=e.target.closest("button[data-rep]"); if(b){
       const r=b.dataset.rep; let last=null, filled=0;
       for(const c of COLS){ const cv=getCell(r,c); if(cv.mixed){ last=null; continue; } if(cv.v!==""){ last=cv.v; continue; } if(last!=null){ setCell(r,c,last); filled++; } }
@@ -1862,6 +1899,7 @@ function bind(){
     }
   });
   tbl.addEventListener("input",e=>{
+    const fn=e.target.closest("input[data-fname]"); if(fn){ const f=S.fronts.find(x=>x.id===fn.dataset.fname); if(f){ f.name=fn.value; save(); recalc(); } return; }
     const nm=e.target.closest("input[data-name]"); if(nm){ const row=S.rows.find(r=>r.id===nm.dataset.name); if(row){ row.name=nm.value; save(); } return; }
     const el=e.target.closest("input.pin"); if(!el) return;
     const r=el.dataset.r, c=COLS[+el.dataset.i], v=el.value.trim();
@@ -1871,8 +1909,10 @@ function bind(){
   });
   tbl.addEventListener("change",e=>{
     if(e.target.closest("input.pin")){ if(COLS[+e.target.dataset.i].t==="y") render(); return; }
-    const cb=e.target.closest("input[data-sel]"); if(!cb) return;
-    S.sel[cb.dataset.sel]=cb.checked; save(); render();
+    const fa=e.target.closest("select[data-fadd]"); if(fa){ const role=fa.value; if(!role) return; const front=fa.dataset.fadd; const id=uid(role);
+      const fr=frontRows(front); const lastIdx = fr.length ? S.rows.indexOf(fr[fr.length-1]) : S.rows.length-1;
+      S.rows.splice(lastIdx+1,0,{id,role,front,name:""}); S.sel[id]=true; const f=S.fronts.find(x=>x.id===front); if(f) f.coll=false; sortRows(); save(); render();
+      const inp=tbl.querySelector(`input.pin[data-r="${id}"]`); if(inp) inp.focus(); return; }
   });
 }
 load(); render();
