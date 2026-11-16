@@ -228,7 +228,7 @@ table.imc .stk{position:sticky;left:0;z-index:2;background:var(--card);min-width
 table.imc thead .stk{z-index:3}
 table.imc tr.tot .stk{background:var(--card)}
 table.imc th.imadj,table.imc td.imadj{background:var(--soft)}
-.imc-sum .pstrip{grid-template-columns:1.3fr repeat(4,minmax(0,1fr))}
+.imc-sum .pstrip{grid-template-columns:1.3fr repeat(3,minmax(0,1fr))}
 @media (max-width:900px){.imc-sum .pstrip{grid-template-columns:repeat(2,minmax(0,1fr))}.imc-sum .pstrip > div{border-left:0;border-top:1px solid var(--line)}.imc-sum .hero{grid-column:1/-1}}
 table.imc .ygrp{text-align:left;border-bottom:1px solid var(--line);padding:4px 8px}
 .ytog{border:0;background:none;font:inherit;font-weight:700;color:var(--ink);cursor:pointer;padding:2px 4px;font-size:.8rem;letter-spacing:.04em}
@@ -331,7 +331,8 @@ td.vs{font-size:.78rem;color:var(--muted)}
       <span class="userchip" id="userChip"></span><button class="btn link" id="logoutBtn" type="button">Sair</button>
       <span id="syncChip" class="sync"><span class="dot"></span><span id="syncTxt">Conectando…</span></span>
       <button class="btn" id="fsBtn" type="button" hidden><svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M1 5V1h4M9 1h4v4M13 9v4H9M5 13H1V9"/></svg><span id="fsTxt">Tela cheia</span></button>
-      <button class="btn" id="saveBtn" type="button" title="Baixa uma cópia do painel com a planilha, os parâmetros e as regras de horas já carregados">Salvar</button>
+      <button class="btn" id="saveBtn" type="button" title="Salva planilha, parâmetros, metas e IMC">Salvar</button>
+      <button class="btn" id="dlBtn" type="button" title="Baixa um arquivo .html com tudo o que está carregado">Baixar cópia</button>
       <label class="btn primary" for="file">Importar planilha</label>
       <input type="file" id="file" accept=".xls,.xlsx,.xml,.csv">
     </div>
@@ -1162,6 +1163,8 @@ async function initDb(){
   try{ db = window.claude && window.claude.use ? await window.claude.use("db") : null; }catch(e){ db=null; }
   if(!db){ setSync("plain", state.snapshotAt ? `Cópia salva em ${new Date(state.snapshotAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})}` : "Salvo só neste navegador"); renderAll(); return; }
   state.db=db; state.shared=true;
+  window.IMC_PERSIST = st => persistImc(st);
+  db.doc("config/imc").onSnapshot(d=>{ if(!d.exists) return; const v=d.data(); if(!v || typeof v.state!=="string" || v.state===imcLastSent) return; try{ const st=JSON.parse(v.state); imcLastSent=v.state; if(window.IMC) window.IMC.setState(st); }catch(e){} },()=>{});
   db.collection("settings").onSnapshot(snap=>{
     for(const d of snap.docs){ const v=d.data(); state.settings[d.id]={real:v.real??null, valor:v.valor??null, prazo:v.prazo??"", deduzir:!!v.deduzir, reserva:v.reserva??5, ded:(v.ded&&typeof v.ded==="object")?v.ded:{}, ov:(v.ov&&typeof v.ov==="object")?v.ov:{}}; }
     setSync("ok","Salvo para a equipe"); renderAll();
@@ -1438,7 +1441,36 @@ function loadSnapshot(){
   state.snapshotAt=snap.savedAt;
   return true;
 }
-$("saveBtn").addEventListener("click",saveSnapshot);
+$("dlBtn").addEventListener("click",saveSnapshot);
+// Salvar: no link do Claude grava no armazenamento do próprio link; fora dele, no navegador
+async function saveAll(){
+  lsSave();
+  if(state.db){
+    setSync("plain","Salvando…");
+    try{
+      const now=new Date().toISOString();
+      for(const [e,v] of Object.entries(state.settings)) await state.db.doc("settings/"+e).set({...v, updatedAt:v.updatedAt||now});
+      await state.db.doc("config/pessoas").set({pessoas:state.people||{}, updatedAt:now});
+      await state.db.doc("config/bsc").set({porUsuario:state.bsc||{}, updatedAt:now});
+      if(window.IMC) await persistImc(window.IMC.getState(), true);
+      setSync("ok","Salvo neste link");
+      showMsg("info","Tudo salvo neste link. Quem abrir este mesmo link vê a planilha, os parâmetros, as metas e o orçamento do IMC.");
+    }catch(e){ setSync("warn","Erro ao salvar"); showMsg("err","Não foi possível salvar no link agora. Os dados continuam neste navegador; tente de novo em instantes."); }
+  } else {
+    showMsg("info","Salvo neste navegador: ao abrir este endereço aqui de novo, tudo volta como está. Esta versão não tem armazenamento no link; para levar a outro computador ou pessoa, use <b>Baixar cópia</b>.");
+  }
+}
+$("saveBtn").addEventListener("click",saveAll);
+// IMC salvo no armazenamento do link (quando existe)
+let imcLastSent=null;
+async function persistImc(st, now){
+  if(!state.db) return;
+  const txt=JSON.stringify(st);
+  const go=async()=>{ imcLastSent=txt; await state.db.doc("config/imc").set({state:txt, updatedAt:new Date().toISOString()}); };
+  clearTimeout(persistImc.t);
+  if(now) return go();
+  persistImc.t=setTimeout(()=>{ go().catch(()=>setSync("warn","IMC só neste navegador")); },700);
+}
 
 /* ---------- acesso ---------- */
 // usuários autorizados: SHA-256 de "usuário:senha"
@@ -1508,8 +1540,8 @@ const addMonths=(k,n)=>{ let [y,m]=k.split("-").map(Number); m+=n; while(m>12){m
 const diffMonths=(a,b)=>{ const [y1,m1]=a.split("-").map(Number), [y2,m2]=b.split("-").map(Number); return (y2-y1)*12+(m2-m1); };
 const DEF={ini:nextMonthKey(), n:7, real:100, base:"du", hd:8, hm:168, reaj:6, view:"mes", coll:{}, rows:null, sel:{}, alloc:{}, allocW:{}, onlySel:false, selMode:false};
 let S;
-function load(){
-  let v=null; try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
+function load(src){
+  let v=src||null; if(!v){ try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){} }
   S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})}; S.coll={...(S.coll||{})};
   if(S.view==="ano"){ S.view="mes"; S.yearMode=true; S.coll={}; }
   if(!Array.isArray(S.rows) || !S.rows.length) S.rows=ROLES.map(([id])=>({id, role:id, name:""}));
@@ -1526,7 +1558,7 @@ function load(){
 function uid(role){ let i=1; const ex=id=>S && S.rows && S.rows.some(r=>r.id===id); if(!ex(role)) return role; i=2; while(ex(`${role}_${i}`)) i++; return `${role}_${i}`; }
 function sortRows(){ const ord=Object.fromEntries(ROLES.map(([id],i)=>[id,i])); const fo=Object.fromEntries((S.fronts||[]).map((f,i)=>[f.id,i])); const pos=new Map(S.rows.map((r,i)=>[r,i])); S.rows.sort((a,b)=>(fo[a.front]-fo[b.front]) || (ord[a.role]-ord[b.role]) || (pos.get(a)-pos.get(b))); }
 const frontRows=fid=>S.rows.filter(r=>r.front===fid);
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} if(typeof window.IMC_PERSIST==="function"){ try{ window.IMC_PERSIST(S); }catch(e){} } }
 const fim=()=>addMonths(S.ini,S.n-1);
 function months(){ const out=[]; for(let i=0;i<S.n;i++){ const k=addMonths(S.ini,i); const [y,m]=k.split("-").map(Number); out.push({k,y,m,bd:bizDaysMonth(y,m)}); } return out; }
 function bizDaysMonth(y,m){ let n=0; const last=new Date(y,m,0).getDate(); for(let d=1;d<=last;d++) if(isBiz(new Date(y,m-1,d))) n++; return n; }
@@ -1626,7 +1658,6 @@ const MARKUP = `
     <div class="pstrip">
       <div class="hero"><span>Valor líquido do projeto</span><b id="imcLiq">R$ 0,00</b></div>
       <div><span>Total de horas</span><b id="imcH">0 h</b></div>
-      <div><span>Valor bruto (sem realização)</span><b id="imcBruto">R$ 0,00</b></div>
       <div><span>Valor líquido por mês</span><b id="imcMes">R$ 0,00</b></div>
       <div><span>Taxa média líquida</span><b id="imcTaxa">—</b></div>
     </div>
@@ -1758,7 +1789,7 @@ function recalc(){
     ${FT.map(x=>`<tr><td><div class="who">${esc(x.f.name||"Sem nome")}</div></td><td class="n">${x.n}</td><td class="n">${fh(x.h)}</td><td class="n">${fh(x.h/Math.max(1,S.n))}</td><td class="n">${BRL.format(x.vl)}</td><td class="n">${BRL.format(x.vl/Math.max(1,S.n))}</td><td class="n">${C.VL>0?NF(1).format(x.vl/C.VL*100):"0"}%</td></tr>`).join("")}
     <tr class="tot"><td>Total</td><td class="n">${FT.reduce((a,x)=>a+x.n,0)}</td><td class="n">${fh(C.H)}</td><td class="n">${fh(C.H/Math.max(1,S.n))}</td><td class="n">${BRL.format(C.VL)}</td><td class="n">${BRL.format(C.VL/Math.max(1,S.n))}</td><td class="n">100%</td></tr></tbody></table>` : "";
   g("imcTH").textContent=fh(C.H); g("imcTV").textContent=BRL.format(C.VL);
-  g("imcLiq").textContent=BRL.format(C.VL); g("imcH").textContent=fh(C.H); g("imcBruto").textContent=BRL.format(C.Vb);
+  g("imcLiq").textContent=BRL.format(C.VL); g("imcH").textContent=fh(C.H); 
   g("imcTaxa").textContent= C.H>0 ? `${BRL.format(C.VL/C.H)}/h` : "—";
   g("imcMes").textContent= BRL.format(C.VL/Math.max(1,S.n));
   // resumo por cargo
@@ -1922,7 +1953,7 @@ function bind(){
   });
 }
 load(); render();
-window.IMC={render, recalc, calc, summaryText, _state:()=>S};
+window.IMC={render, recalc, calc, summaryText, _state:()=>S, getState:()=>JSON.parse(JSON.stringify(S)), setState:(v)=>{ load(v); try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} if(ROOT.querySelector("#imcDash")) render(); }};
 })();
 </script>
 
