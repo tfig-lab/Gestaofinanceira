@@ -1456,25 +1456,93 @@ const BRL=new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",minimum
 const NF=(d)=>new Intl.NumberFormat("pt-BR",{minimumFractionDigits:0,maximumFractionDigits:d});
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const pad=n=>String(n).padStart(2,"0");
+const iso=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
 function parseNum(v){
   if(v==null) return null; let s=String(v).trim().replace(/[R$%\s]/g,""); if(!s) return null;
   if(s.includes(",")) s=s.replace(/\./g,"").replace(",","."); else if((s.match(/\./g)||[]).length>1) s=s.replace(/\./g,"");
   const n=parseFloat(s); return isFinite(n)?n:null;
 }
+// feriados nacionais (fixos + Carnaval, Sexta-feira Santa e Corpus Christi)
+function easter(y){ const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1; return new Date(y,mo-1,da); }
+const HC={};
+function hols(y){ if(HC[y]) return HC[y]; const s=new Set(["01-01","04-21","05-01","09-07","10-12","11-02","11-15","11-20","12-25"].map(md=>`${y}-${md}`)); const E=easter(y); for(const o of [-48,-47,-2,60]){ const d=new Date(E); d.setDate(d.getDate()+o); s.add(iso(d)); } return HC[y]=s; }
+const isBiz=d=>{ const w=d.getDay(); return w!==0 && w!==6 && !hols(d.getFullYear()).has(iso(d)); };
 function nextMonthKey(){ const d=new Date(); d.setMonth(d.getMonth()+1); return `${d.getFullYear()}-${pad(d.getMonth()+1)}`; }
-const DEF={ini:nextMonthKey(), n:7, real:100, hm:168, reaj:6, sel:{}, alloc:{}, onlySel:false};
+const addMonths=(k,n)=>{ let [y,m]=k.split("-").map(Number); m+=n; while(m>12){m-=12;y++;} while(m<1){m+=12;y--;} return `${y}-${pad(m)}`; };
+const diffMonths=(a,b)=>{ const [y1,m1]=a.split("-").map(Number), [y2,m2]=b.split("-").map(Number); return (y2-y1)*12+(m2-m1); };
+const DEF={ini:nextMonthKey(), n:7, real:100, base:"du", hd:8, hm:168, reaj:6, view:"mes", sel:{}, alloc:{}, allocW:{}, onlySel:false};
 let S;
 function load(){
   let v=null; try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){}
-  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})};
+  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})};
+  if(v && !v.base) S.base="du";
 }
 function save(){ try{ localStorage.setItem(KEY, JSON.stringify(S)); }catch(e){} }
-function months(){ const out=[]; let [y,m]=S.ini.split("-").map(Number); for(let i=0;i<S.n;i++){ out.push({k:`${y}-${pad(m)}`,y,m}); m++; if(m>12){m=1;y++;} } return out; }
+const fim=()=>addMonths(S.ini,S.n-1);
+// meses do período
+function months(){ const out=[]; for(let i=0;i<S.n;i++){ const k=addMonths(S.ini,i); const [y,m]=k.split("-").map(Number); out.push({k,y,m,bd:bizDaysMonth(y,m)}); } return out; }
+function bizDaysMonth(y,m){ let n=0; const last=new Date(y,m,0).getDate(); for(let d=1;d<=last;d++) if(isBiz(new Date(y,m-1,d))) n++; return n; }
+// dias úteis do período, com o mês e a semana (segunda-feira) de cada um
+function bizDays(){
+  const [y,m]=S.ini.split("-").map(Number); const [y2,m2]=fim().split("-").map(Number);
+  const d=new Date(y,m-1,1), end=new Date(y2,m2,0); const out=[];
+  for(; d<=end; d.setDate(d.getDate()+1)){ if(!isBiz(d)) continue; const mon=new Date(d); mon.setDate(mon.getDate()-((mon.getDay()+6)%7)); out.push({k:iso(d), mk:iso(d).slice(0,7), wk:iso(mon), y:d.getFullYear(), m:d.getMonth()+1}); }
+  return out;
+}
 // ciclos de reajuste: base abr/2026, reajuste todo abril
 const cycles=(y,m)=>Math.max(0,(y-2026)-(m<4?1:0));
 const factor=(y,m)=>Math.pow(1+S.reaj/100, cycles(y,m));
-const label=(o)=>`${MES[o.m-1]}/${String(o.y).slice(2)}`;
-const pctOf=(r,k)=>{ const v=(S.alloc[r]||{})[k]; return v==null||v===""?0:(parseNum(v)||0); };
+const mlabel=(y,m)=>`${MES[m-1]}/${String(y).slice(2)}`;
+const hoursMonth=o=> S.base==="fixo" ? S.hm : o.bd*S.hd;
+const raw=(store,r,k)=>{ const v=(store[r]||{})[k]; return v==null?"":String(v); };
+const pnum=s=> s===""?0:(parseNum(s)||0);
+
+// colunas da visão atual
+function columns(){
+  const M=months();
+  if(S.view==="ano"){
+    const by={}; for(const o of M){ (by[o.y]||(by[o.y]={k:String(o.y),y:o.y,months:[]})).months.push(o); }
+    return Object.values(by).map(c=>{ const f0=factor(c.y,c.months[0].m), f1=factor(c.y,c.months[c.months.length-1].m);
+      return {...c, label:String(c.y), sub:`${mlabel(c.y,c.months[0].m)} a ${mlabel(c.y,c.months[c.months.length-1].m)} · ${c.months.length} ${c.months.length===1?"mês":"meses"}`, fmax:Math.max(f0,f1), fmin:Math.min(f0,f1)}; });
+  }
+  if(S.view==="semana"){
+    const by={}; for(const d of bizDays()){ (by[d.wk]||(by[d.wk]={k:d.wk,days:[]})).days.push(d); }
+    return Object.values(by).map(c=>{ const [y,m,dd]=c.k.split("-"); const fs=c.days.map(d=>factor(d.y,d.m)); return {...c, label:`${dd}/${m}`, sub:`${c.days.length} ${c.days.length===1?"dia útil":"dias úteis"}`, fmax:Math.max(...fs), fmin:Math.min(...fs)}; });
+  }
+  return M.map(o=>({...o, label:mlabel(o.y,o.m), sub: S.base==="fixo" ? `${NF(1).format(S.hm)} h` : `${o.bd} dias úteis`, fmax:factor(o.y,o.m), fmin:factor(o.y,o.m)}));
+}
+const usesWeekly=()=>S.view==="semana";
+function getCell(r,c){
+  if(S.view==="semana") return {v:raw(S.allocW,r,c.k)};
+  if(S.view==="ano"){ const vals=[...new Set(c.months.map(o=>raw(S.alloc,r,o.k)))]; return vals.length===1 ? {v:vals[0]} : {v:"",mixed:true}; }
+  return {v:raw(S.alloc,r,c.k)};
+}
+function setCell(r,c,v){
+  if(S.view==="semana"){ S.allocW[r]={...(S.allocW[r]||{})}; if(v==="") delete S.allocW[r][c.k]; else S.allocW[r][c.k]=v; return; }
+  S.alloc[r]={...(S.alloc[r]||{})};
+  const ks = S.view==="ano" ? c.months.map(o=>o.k) : [c.k];
+  for(const k of ks){ if(v==="") delete S.alloc[r][k]; else S.alloc[r][k]=v; }
+}
+// horas e valor bruto de um cargo numa coluna
+function cellCalc(r,sc,c){
+  if(!S.sel[r]) return {h:0,vb:0};
+  if(S.view==="semana"){ const p=pnum(raw(S.allocW,r,c.k))/100; let h=0,vb=0; for(const d of c.days){ const hh=S.hd*p; h+=hh; vb+=hh*sc*factor(d.y,d.m); } return {h,vb}; }
+  const ms = S.view==="ano" ? c.months : [c];
+  let h=0,vb=0; for(const o of ms){ const hh=hoursMonth(o)*pnum(raw(S.alloc,r,o.k))/100; h+=hh; vb+=hh*sc*factor(o.y,o.m); } return {h,vb};
+}
+// ao trocar entre semana e mês/ano, copia os % se a outra visão estiver vazia para o cargo
+function seedOnSwitch(to){
+  if(to==="semana"){
+    const days=bizDays(); const firstDay={}; for(const d of days) if(!firstDay[d.wk]) firstDay[d.wk]=d;
+    for(const [r] of ROLES){ if(Object.keys(S.allocW[r]||{}).length || !Object.keys(S.alloc[r]||{}).length) continue;
+      S.allocW[r]={}; for(const wk in firstDay){ const v=raw(S.alloc,r,firstDay[wk].mk); if(v!=="") S.allocW[r][wk]=v; } }
+  } else {
+    const days=bizDays(); const firstOfMonth={}; for(const d of days) if(!firstOfMonth[d.mk]) firstOfMonth[d.mk]=d;
+    for(const [r] of ROLES){ if(Object.keys(S.alloc[r]||{}).length || !Object.keys(S.allocW[r]||{}).length) continue;
+      S.alloc[r]={}; for(const mk in firstOfMonth){ const v=raw(S.allocW,r,firstOfMonth[mk].wk); if(v!=="") S.alloc[r][mk]=v; } }
+  }
+}
+const chip=c=> c.fmax>1 ? `<br><span class="adjc">+${NF(2).format((c.fmax-1)*100)}%${c.fmin!==c.fmax?" parcial":""}</span>` : "";
 
 const MARKUP = `
 <div class="dash" id="imcDash">
@@ -1486,13 +1554,19 @@ const MARKUP = `
       </div>
       <div class="assume">
         <div class="field f-prazo"><label for="imcIni">Mês inicial</label><div class="inp"><input id="imcIni" type="month"></div></div>
+        <div class="field f-prazo"><label for="imcFim">Mês final</label><div class="inp"><input id="imcFim" type="month"></div></div>
         <div class="field f-real"><label for="imcN">Nº de meses</label><div class="inp"><input id="imcN" type="text" inputmode="numeric"></div></div>
         <div class="field f-real"><label for="imcReal">Realização</label><div class="inp"><input id="imcReal" type="text" inputmode="decimal"><span>%</span></div></div>
-        <div class="field f-real"><label for="imcHm">Horas/mês (100%)</label><div class="inp"><input id="imcHm" type="text" inputmode="decimal"><span>h</span></div></div>
         <div class="field f-real"><label for="imcReaj">Reajuste anual</label><div class="inp"><input id="imcReaj" type="text" inputmode="decimal"><span>%</span></div></div>
       </div>
     </div>
-    <div class="proj-foot"><span>O reajuste vale a partir de cada abril, de forma composta. Células vazias contam como 0%.</span><span class="imc-actions"><label class="check" style="padding:0"><input type="checkbox" id="imcOnly"><span>Mostrar só cargos selecionados</span></label><button class="btn link danger" id="imcClear" type="button">Limpar tabela</button><button class="btn" id="imcCopy" type="button">Copiar resumo</button><button class="btn" id="imcDl" type="button">Baixar esta aba</button></span></div>
+    <div class="assume" style="align-items:flex-end">
+      <div class="field" style="width:auto"><label>Horas por mês</label><div class="seg" role="group" aria-label="Base de horas"><button id="imcBDu" type="button">Dias úteis do mês</button><button id="imcBFx" type="button">Fixa</button></div></div>
+      <div class="field f-real" id="imcHdBox"><label for="imcHd">Horas por dia</label><div class="inp"><input id="imcHd" type="text" inputmode="decimal"><span>h</span></div></div>
+      <div class="field f-real" id="imcHmBox"><label for="imcHm">Horas/mês (100%)</label><div class="inp"><input id="imcHm" type="text" inputmode="decimal"><span>h</span></div></div>
+      <div class="field" style="width:auto"><label>Ver por</label><div class="seg" role="group" aria-label="Visão da tabela"><button id="imcVS" type="button" data-v="semana">Semana</button><button id="imcVM" type="button" data-v="mes">Mês</button><button id="imcVA" type="button" data-v="ano">Ano</button></div></div>
+    </div>
+    <div class="proj-foot"><span id="imcHint"></span><span class="imc-actions"><label class="check" style="padding:0"><input type="checkbox" id="imcOnly"><span>Mostrar só cargos selecionados</span></label><button class="btn link danger" id="imcClear" type="button">Limpar tabela</button><button class="btn" id="imcCopy" type="button">Copiar resumo</button><button class="btn" id="imcDl" type="button">Baixar esta aba</button></span></div>
   </section>
 
   <section class="c12 imc-sum" aria-label="Resumo do orçamento">
@@ -1504,70 +1578,75 @@ const MARKUP = `
     </div>
   </section>
 
-  <section class="card c12" aria-label="Alocação por cargo e mês">
-    <div class="card-hd"><h3>Alocação por cargo e mês</h3><span class="sub" id="imcPeriod"></span></div>
+  <section class="card c12" aria-label="Alocação por cargo">
+    <div class="card-hd"><h3 id="imcTitle">Alocação por cargo e mês</h3><span class="sub" id="imcPeriod"></span></div>
     <div class="tbl imc-scroll"><table class="imc" id="imcTbl"></table></div>
   </section>
   <p class="source c12" id="imcMsg" role="status"></p>
 </div>`;
 
+let COLS=[];
 function render(){
+  if(!ROOT.querySelector("#imcDash")){ ROOT.innerHTML=MARKUP; bind(); }
+  COLS=columns();
+  const ae=document.activeElement, g=id=>document.getElementById(id);
+  const setv=(id,v)=>{ const el=g(id); if(el!==ae) el.value=v; };
+  setv("imcIni",S.ini); setv("imcFim",fim()); setv("imcN",S.n); setv("imcReal",NF(2).format(S.real)); setv("imcReaj",NF(2).format(S.reaj));
+  setv("imcHd",NF(2).format(S.hd)); setv("imcHm",NF(2).format(S.hm));
+  g("imcBDu").setAttribute("aria-pressed",String(S.base!=="fixo")); g("imcBFx").setAttribute("aria-pressed",String(S.base==="fixo"));
+  for(const id of ["imcVS","imcVM","imcVA"]) g(id).setAttribute("aria-pressed",String(g(id).dataset.v===S.view));
+  g("imcHmBox").hidden = S.base!=="fixo" || S.view==="semana";
+  g("imcHdBox").hidden = S.base==="fixo" && S.view!=="semana";
+  g("imcOnly").checked=!!S.onlySel;
   const M=months();
-  const root=ROOT;
-  if(!root.querySelector("#imcDash")){ root.innerHTML=MARKUP; bind(); }
-  const ae=document.activeElement;
-  const setv=(id,v)=>{ const el=document.getElementById(id); if(el!==ae) el.value=v; };
-  setv("imcIni",S.ini); setv("imcN",S.n); setv("imcReal",NF(2).format(S.real)); setv("imcHm",NF(2).format(S.hm)); setv("imcReaj",NF(2).format(S.reaj));
-  document.getElementById("imcOnly").checked=!!S.onlySel;
-  document.getElementById("imcPeriod").textContent=`${label(M[0])} a ${label(M[M.length-1])} · ${M.length} ${M.length===1?"mês":"meses"}`;
-  const head=`<thead><tr><th class="stk">Cargo</th><th class="n">No projeto</th>${M.map(o=>{const f=factor(o.y,o.m); return `<th class="n ${f>1?"imadj":""}">${label(o)}${f>1?`<br><span class="adjc">+${NF(2).format((f-1)*100)}%</span>`:""}</th>`;}).join("")}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
+  g("imcPeriod").textContent=`${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} · ${M.length} ${M.length===1?"mês":"meses"}`;
+  g("imcTitle").textContent= S.view==="semana" ? "Alocação por cargo e semana" : (S.view==="ano" ? "Alocação por cargo e ano" : "Alocação por cargo e mês");
+  g("imcHint").textContent = S.view==="semana"
+    ? `Cada semana usa os dias úteis dela × ${NF(1).format(S.hd)} h. A visão por semana tem alocação própria; ao trocar, os % são copiados se a outra visão estiver vazia.`
+    : (S.view==="ano" ? "O % digitado no ano vale para todos os meses dele. \"Vários\" indica meses com % diferentes." : (S.base==="fixo" ? `Cada mês tem ${NF(1).format(S.hm)} h a 100%.` : `Horas do mês = dias úteis (sem feriados nacionais) × ${NF(1).format(S.hd)} h.`)) + " Reajuste a cada abril, composto. Vazio = 0%.";
+  const head=`<thead><tr><th class="stk">Cargo</th><th class="n">No projeto</th>${COLS.map((c,i)=>`<th class="n ${c.fmax>1?"imadj":""}">${esc(c.label)}${S.view==="semana"?`<br><span class="bdays">${esc(c.sub)}</span>`:`<br><span class="bdays">${esc(c.sub)}</span>`}${chip(c)}</th>`).join("")}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
   const body=ROLES.map(([id,nm,sc])=>{
     const on=!!S.sel[id];
     if(S.onlySel && !on) return "";
-    return `<tr data-r="${id}" class="${on?"":"imoff"}"><td class="stk"><div class="who">${esc(nm)}</div><div class="lvl">R$ ${NF(0).format(sc)}/h base</div><button class="btn link rep" data-rep="${id}" type="button">Repetir →</button></td>
+    return `<tr data-r="${id}" class="${on?"":"imoff"}"><td class="stk"><div class="who">${esc(nm)}</div><div class="lvl">R$ ${NF(0).format(sc)}/h base</div><button class="btn link rep" data-rep="${id}" type="button" title="Preenche os vazios com o último % à esquerda">Repetir →</button></td>
       <td class="n"><input type="checkbox" data-sel="${id}" ${on?"checked":""} aria-label="${esc(nm)} entra no projeto"></td>
-      ${M.map(o=>{ const v=(S.alloc[id]||{})[o.k]; return `<td class="n cell ${factor(o.y,o.m)>1?"imadj":""}"><input class="pin" data-r="${id}" data-k="${o.k}" type="text" inputmode="decimal" value="${v==null?"":esc(v)}" placeholder="0" aria-label="${esc(nm)} ${label(o)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${o.k}"></div></td>`; }).join("")}
+      ${COLS.map((c,i)=>{ const cv=getCell(id,c); return `<td class="n cell ${c.fmax>1?"imadj":""}"><input class="pin" data-r="${id}" data-i="${i}" type="text" inputmode="decimal" value="${esc(cv.v)}" placeholder="${cv.mixed?"vários":"0"}" aria-label="${esc(nm)} ${esc(c.label)} %"><span class="pct">%</span><div class="hh" id="h_${id}_${i}"></div></td>`; }).join("")}
       <td class="n" id="th_${id}"></td><td class="n" id="tv_${id}"></td></tr>`;
   }).join("");
-  const foot=`<tr class="tot"><td class="stk">Total do mês</td><td></td>${M.map(o=>`<td class="n ${factor(o.y,o.m)>1?"imadj":""}"><div id="mh_${o.k}"></div><div class="mv" id="mv_${o.k}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
-  document.getElementById("imcTbl").innerHTML=head+`<tbody>${body}${foot}</tbody>`;
+  const foot=`<tr class="tot"><td class="stk">Total</td><td></td>${COLS.map((c,i)=>`<td class="n ${c.fmax>1?"imadj":""}"><div id="ch_${i}"></div><div class="mv" id="cv_${i}"></div></td>`).join("")}<td class="n" id="imcTH"></td><td class="n" id="imcTV"></td></tr>`;
+  g("imcTbl").innerHTML=head+`<tbody>${body}${foot}</tbody>`;
   recalc();
 }
 function calc(){
-  const M=months(); const R=S.real/100;
-  const rows={}, colH={}, colV={}; let H=0, Vb=0;
+  const cols=COLS.length?COLS:columns(); const R=S.real/100;
+  const rows={}, colH=cols.map(()=>0), colV=cols.map(()=>0); let H=0, Vb=0;
   for(const [id,nm,sc] of ROLES){
-    let rh=0, rv=0; const cells={};
-    for(const o of M){
-      const p = S.sel[id] ? pctOf(id,o.k) : 0;
-      const h=S.hm*(p/100); const vb=h*sc*factor(o.y,o.m);
-      cells[o.k]={h,vb}; rh+=h; rv+=vb; colH[o.k]=(colH[o.k]||0)+h; colV[o.k]=(colV[o.k]||0)+vb*R;
-    }
+    let rh=0, rv=0; const cells=[];
+    cols.forEach((c,i)=>{ const x=cellCalc(id,sc,c); cells.push(x); rh+=x.h; rv+=x.vb; colH[i]+=x.h; colV[i]+=x.vb*R; });
     rows[id]={nm,sc,cells,h:rh,vb:rv,vl:rv*R}; H+=rh; Vb+=rv;
   }
-  return {M,rows,colH,colV,H,Vb,VL:Vb*R};
+  return {cols,rows,colH,colV,H,Vb,VL:Vb*R};
 }
 function recalc(){
-  const C=calc(); const fh=v=>`${NF(1).format(v)} h`;
+  const C=calc(); const fh=v=>`${NF(1).format(v)} h`, g=id=>document.getElementById(id);
   for(const [id] of ROLES){
     const r=C.rows[id];
-    for(const o of C.M){ const el=document.getElementById(`h_${id}_${o.k}`); if(el) el.textContent = r.cells[o.k].h>0 ? fh(r.cells[o.k].h) : ""; }
-    const th=document.getElementById(`th_${id}`), tv=document.getElementById(`tv_${id}`);
+    C.cols.forEach((c,i)=>{ const el=g(`h_${id}_${i}`); if(el) el.textContent = r.cells[i].h>0 ? fh(r.cells[i].h) : ""; });
+    const th=g(`th_${id}`), tv=g(`tv_${id}`);
     if(th) th.innerHTML = r.h>0 ? `<b>${fh(r.h)}</b>` : `<span class="zero">–</span>`;
     if(tv) tv.innerHTML = r.vl>0 ? BRL.format(r.vl) : `<span class="zero">–</span>`;
   }
-  for(const o of C.M){ const a=document.getElementById(`mh_${o.k}`), b=document.getElementById(`mv_${o.k}`); if(a) a.textContent=fh(C.colH[o.k]||0); if(b) b.textContent=BRL.format(C.colV[o.k]||0); }
-  document.getElementById("imcTH").textContent=fh(C.H); document.getElementById("imcTV").textContent=BRL.format(C.VL);
-  document.getElementById("imcLiq").textContent=BRL.format(C.VL);
-  document.getElementById("imcH").textContent=fh(C.H);
-  document.getElementById("imcBruto").textContent=BRL.format(C.Vb);
-  document.getElementById("imcTaxa").textContent= C.H>0 ? `${BRL.format(C.VL/C.H)}/h` : "—";
+  C.cols.forEach((c,i)=>{ const a=g(`ch_${i}`), b=g(`cv_${i}`); if(a) a.textContent=fh(C.colH[i]); if(b) b.textContent=BRL.format(C.colV[i]); });
+  g("imcTH").textContent=fh(C.H); g("imcTV").textContent=BRL.format(C.VL);
+  g("imcLiq").textContent=BRL.format(C.VL); g("imcH").textContent=fh(C.H); g("imcBruto").textContent=BRL.format(C.Vb);
+  g("imcTaxa").textContent= C.H>0 ? `${BRL.format(C.VL/C.H)}/h` : "—";
   return C;
 }
 function summaryText(){
-  const C=calc(); const M=C.M;
-  const L=[`Orçamento Advisory/CMG — ${label(M[0])} a ${label(M[M.length-1])} (${M.length} ${M.length===1?"mês":"meses"})`,
-    `Realização ${NF(2).format(S.real)}% · ${NF(2).format(S.hm)} h/mês a 100% · reajuste ${NF(2).format(S.reaj)}% a.a. em abril (scales base abr/2026)`, ""];
+  const C=calc(); const M=months();
+  const base = (S.view==="semana"||S.base!=="fixo") ? `horas pelos dias úteis × ${NF(2).format(S.hd)} h/dia` : `${NF(2).format(S.hm)} h/mês a 100%`;
+  const L=[`Orçamento Advisory/CMG — ${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} (${M.length} ${M.length===1?"mês":"meses"})`,
+    `Realização ${NF(2).format(S.real)}% · ${base} · reajuste ${NF(2).format(S.reaj)}% a.a. em abril (scales base abr/2026)${S.view==="semana"?" · alocação por semana":""}`, ""];
   for(const [id] of ROLES){ const r=C.rows[id]; if(r.h>0) L.push(`${r.nm} (R$ ${NF(0).format(r.sc)}/h base): ${NF(1).format(r.h)} h · ${BRL.format(r.vl)}`); }
   L.push("", `Total: ${NF(1).format(C.H)} h`, `Valor bruto: ${BRL.format(C.Vb)}`, `Valor líquido: ${BRL.format(C.VL)}`, `Taxa média líquida: ${C.H>0?BRL.format(C.VL/C.H)+"/h":"—"}`);
   return L.join("\n");
@@ -1603,14 +1682,18 @@ async function download(){
 function bind(){
   const g=id=>document.getElementById(id);
   g("imcIni").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ S.ini=e.target.value; save(); render(); } });
+  g("imcFim").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ S.n=Math.max(1,Math.min(36,diffMonths(S.ini,e.target.value)+1)); if(diffMonths(S.ini,e.target.value)+1>36) msg("O período vai até 36 meses."); save(); render(); } });
   g("imcN").addEventListener("change",e=>{ const v=parseNum(e.target.value); if(v!=null){ S.n=Math.max(1,Math.min(36,Math.round(v))); } save(); render(); });
-  for(const [id,k] of [["imcReal","real"],["imcHm","hm"],["imcReaj","reaj"]]){
+  for(const [id,k] of [["imcReal","real"],["imcHm","hm"],["imcHd","hd"],["imcReaj","reaj"]]){
     g(id).addEventListener("input",e=>{ const v=parseNum(e.target.value); if(v!=null && v>=0){ S[k]=v; save(); if(k==="reaj") return; recalc(); } });
     g(id).addEventListener("change",()=>render());
   }
+  g("imcBDu").addEventListener("click",()=>{ S.base="du"; save(); render(); });
+  g("imcBFx").addEventListener("click",()=>{ S.base="fixo"; save(); render(); });
+  for(const id of ["imcVS","imcVM","imcVA"]) g(id).addEventListener("click",e=>{ const v=e.currentTarget.dataset.v; if(v===S.view) return; const was=usesWeekly(); S.view=v; if(was!==usesWeekly()) seedOnSwitch(v); save(); render(); });
   g("imcOnly").addEventListener("change",e=>{ S.onlySel=e.target.checked; save(); render(); });
   g("imcClear").addEventListener("click",e=>{
-    const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.sel={}; save(); render(); msg("Tabela limpa."); return; }
+    const b=e.target; if(b.dataset.confirm){ S.alloc={}; S.allocW={}; S.sel={}; save(); render(); msg("Tabela limpa."); return; }
     b.dataset.confirm="1"; b.textContent="Confirmar limpeza"; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.confirm; b.textContent="Limpar tabela"; } },4000);
   });
   g("imcCopy").addEventListener("click",copySummary);
@@ -1618,20 +1701,23 @@ function bind(){
   const tbl=g("imcTbl");
   tbl.addEventListener("input",e=>{
     const el=e.target.closest("input.pin"); if(!el) return;
-    const r=el.dataset.r, k=el.dataset.k, raw=el.value.trim();
-    S.alloc[r]={...(S.alloc[r]||{})}; if(raw==="") delete S.alloc[r][k]; else S.alloc[r][k]=raw;
-    if(raw!=="" && !S.sel[r]){ S.sel[r]=true; const cb=tbl.querySelector(`input[data-sel="${r}"]`); if(cb) cb.checked=true; el.closest("tr").classList.remove("imoff"); }
+    const r=el.dataset.r, c=COLS[+el.dataset.i], v=el.value.trim();
+    setCell(r,c,v);
+    if(v!=="" && !S.sel[r]){ S.sel[r]=true; const cb=tbl.querySelector(`input[data-sel="${r}"]`); if(cb) cb.checked=true; el.closest("tr").classList.remove("imoff"); }
     save(); recalc();
   });
   tbl.addEventListener("change",e=>{
+    if(e.target.closest("input.pin")){ if(S.view==="ano") render(); return; }
     const cb=e.target.closest("input[data-sel]"); if(!cb) return;
     S.sel[cb.dataset.sel]=cb.checked; save(); render();
   });
+  // Repetir →: preenche cada coluna vazia com o último % digitado à esquerda
   tbl.addEventListener("click",e=>{
     const b=e.target.closest("button[data-rep]"); if(!b) return;
-    const r=b.dataset.rep, M=months(); const first=M.map(o=>(S.alloc[r]||{})[o.k]).find(v=>v!=null && String(v).trim()!=="");
-    if(first==null){ msg("Preencha o % de pelo menos um mês desse cargo antes de repetir."); return; }
-    S.alloc[r]={...(S.alloc[r]||{})}; for(const o of M) S.alloc[r][o.k]=first; S.sel[r]=true; save(); render();
+    const r=b.dataset.rep; let last=null, filled=0;
+    for(const c of COLS){ const cv=getCell(r,c); if(cv.mixed){ last=null; continue; } if(cv.v!==""){ last=cv.v; continue; } if(last!=null){ setCell(r,c,last); filled++; } }
+    if(last==null && !filled){ msg("Digite o % de pelo menos um período desse cargo antes de repetir."); return; }
+    S.sel[r]=true; save(); render();
   });
 }
 load(); render();
