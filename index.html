@@ -247,6 +247,9 @@ table.imc.selmode .pin{pointer-events:none}
 
 #imcDash .assume .field{width:128px}
 #imcDash .assume .field.f-prazo{width:165px}
+#imcDash .assume .field.f-mes{width:190px}
+.msel{display:flex;gap:6px}
+.msel .inp:first-child{flex:1.1}.msel .inp:last-child{flex:1}
 .adjc{display:inline-block;margin-top:2px;font-size:.66rem;font-weight:700;color:var(--accent);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 6px;letter-spacing:0;text-transform:none}
 table.imc td.cell{min-width:78px;white-space:nowrap}
 .pin{width:52px;border:1px solid var(--line);background:var(--page);border-radius:3px;padding:4px 5px;text-align:right;font-size:.88rem}
@@ -1581,8 +1584,8 @@ const MARKUP = `
         <div class="nm"><h2>Orçamento de projeto (IMC)</h2></div>
       </div>
       <div class="assume">
-        <div class="field f-prazo"><label for="imcIni">Mês inicial</label><div class="inp"><input id="imcIni" type="month"></div></div>
-        <div class="field f-prazo"><label for="imcFim">Mês final</label><div class="inp"><input id="imcFim" type="month"></div></div>
+        <div class="field f-mes"><label for="imcIniM">Mês inicial</label><div class="msel"><div class="inp"><select id="imcIniM" aria-label="Mês inicial"></select></div><div class="inp"><select id="imcIniY" aria-label="Ano inicial"></select></div></div></div>
+        <div class="field f-mes"><label for="imcFimM">Mês final</label><div class="msel"><div class="inp"><select id="imcFimM" aria-label="Mês final"></select></div><div class="inp"><select id="imcFimY" aria-label="Ano final"></select></div></div></div>
         <div class="field f-real"><label for="imcN">Nº de meses</label><div class="inp"><input id="imcN" type="text" inputmode="numeric"></div></div>
         <div class="field f-real"><label for="imcReal">Realização</label><div class="inp"><input id="imcReal" type="text" inputmode="decimal"><span>%</span></div></div>
         <div class="field f-real"><label for="imcReaj">Reajuste anual</label><div class="inp"><input id="imcReaj" type="text" inputmode="decimal"><span>%</span></div></div>
@@ -1638,7 +1641,12 @@ function render(){
   COLS=columns();
   const ae=document.activeElement, g=id=>document.getElementById(id);
   const setv=(id,v)=>{ const el=g(id); if(el!==ae) el.value=v; };
-  setv("imcIni",S.ini); setv("imcFim",fim()); setv("imcN",S.n); setv("imcReal",NF(2).format(S.real)); setv("imcReaj",NF(2).format(S.reaj));
+  const yNow=new Date().getFullYear(), yIni=+S.ini.slice(0,4), yFim=+fim().slice(0,4);
+  const yrs=[]; for(let y=Math.min(yNow-2,yIni); y<=Math.max(yNow+8,yFim); y++) yrs.push(y);
+  const fillSel=(id,opts,val)=>{ const el=g(id); el.innerHTML=opts.map(([v,t])=>`<option value="${v}" ${String(v)===String(val)?"selected":""}>${t}</option>`).join(""); };
+  const mopts=MES.map((t,i)=>[pad(i+1),t]), yopts=yrs.map(y=>[y,y]);
+  fillSel("imcIniM",mopts,S.ini.slice(5)); fillSel("imcIniY",yopts,yIni);
+  fillSel("imcFimM",mopts,fim().slice(5)); fillSel("imcFimY",yopts,yFim); setv("imcN",S.n); setv("imcReal",NF(2).format(S.real)); setv("imcReaj",NF(2).format(S.reaj));
   setv("imcHd",NF(2).format(S.hd)); setv("imcHm",NF(2).format(S.hm));
   g("imcBDu").setAttribute("aria-pressed",String(S.base!=="fixo")); g("imcBFx").setAttribute("aria-pressed",String(S.base==="fixo"));
   const allC=YS.every(isColl), noneC=YS.every(y=>!isColl(y));
@@ -1780,8 +1788,12 @@ async function download(){
 }
 function bind(){
   const g=id=>document.getElementById(id);
-  g("imcIni").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ S.ini=e.target.value; save(); render(); } });
-  g("imcFim").addEventListener("change",e=>{ if(/^\d{4}-\d{2}$/.test(e.target.value)){ const d=diffMonths(S.ini,e.target.value)+1; S.n=Math.max(1,Math.min(36,d)); if(d>36) msg("O período vai até 36 meses."); save(); render(); } });
+  const onIni=()=>{ S.ini=`${g("imcIniY").value}-${g("imcIniM").value}`; save(); render(); };
+  const onFim=()=>{ const k=`${g("imcFimY").value}-${g("imcFimM").value}`; const d=diffMonths(S.ini,k)+1;
+    if(d<1){ msg("O mês final precisa ser igual ou depois do mês inicial."); render(); return; }
+    if(d>36) msg("O período vai até 36 meses; o mês final foi ajustado."); S.n=Math.max(1,Math.min(36,d)); save(); render(); };
+  g("imcIniM").addEventListener("change",onIni); g("imcIniY").addEventListener("change",onIni);
+  g("imcFimM").addEventListener("change",onFim); g("imcFimY").addEventListener("change",onFim);
   g("imcN").addEventListener("change",e=>{ const v=parseNum(e.target.value); if(v!=null){ S.n=Math.max(1,Math.min(36,Math.round(v))); } save(); render(); });
   for(const [id,k] of [["imcReal","real"],["imcHm","hm"],["imcHd","hd"],["imcReaj","reaj"]]){
     g(id).addEventListener("input",e=>{ const v=parseNum(e.target.value); if(v!=null && v>=0){ S[k]=v; save(); if(k==="reaj") return; recalc(); } });
