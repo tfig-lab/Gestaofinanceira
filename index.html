@@ -256,6 +256,11 @@ table.imc tr.fgrp td.fsub{font-size:.8rem}
 .rsel{border:0;border-bottom:1px dashed transparent;background:transparent;font:inherit;font-weight:600;color:var(--ink);padding:1px 16px 1px 0;cursor:pointer;max-width:160px;appearance:none;-webkit-appearance:none;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 7px) 55%,calc(100% - 3px) 55%;background-size:4px 4px;background-repeat:no-repeat}
 .rsel:hover,.rsel:focus{border-bottom-color:var(--accent);outline:none}
 .rsel option{color:#0B1F33}
+#imcScDet summary{font-size:.95rem;color:var(--ink);font-weight:700}
+#imcScDet summary .sub{font-weight:500;color:var(--muted);font-size:.8rem}
+.sctbl .scinp{width:150px;margin-left:auto}
+.sctbl .scinp input{text-align:right}
+.sctbl tr.scdif td{background:var(--soft)}
 .selbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 12px;border:1px solid var(--accent);border-radius:4px;background:var(--soft);position:sticky;left:0}
 #imcSelMode[aria-pressed="true"]{background:var(--ink);color:var(--card);border-color:var(--ink)}
 
@@ -1516,7 +1521,10 @@ const ROLES = [
   ["esps","Especialista Sênior",3340],["esp","Especialista",2220],["cs","Consultor Sênior",1800],["cp","Consultor Pleno",1230],
   ["cj","Consultor Júnior",910],["trainee","Trainee",660],["estag","Estagiário",610]
 ];
-const ROLE=Object.fromEntries(ROLES.map(([id,nm,sc])=>[id,{id,nm,sc}]));
+const ROLE=Object.fromEntries(ROLES.map(([id,nm,sc])=>[id,{id,nm,base:sc, get sc(){ return scaleOf(id); }}]));
+const DEFSC=Object.fromEntries(ROLES.map(([id,,sc])=>[id,sc]));
+// scale editável (R$/h base abr/2026); sem valor salvo, usa o padrão Advisory/CMG
+function scaleOf(id){ const v=S && S.scales ? S.scales[id] : null; return (typeof v==="number" && v>0) ? v : DEFSC[id]; }
 const KEY="painel-imc-v1";
 const MAXM=120; // limite do período: 10 anos
 const MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
@@ -1530,6 +1538,8 @@ function parseNum(v){
   if(s.includes(",")) s=s.replace(/\./g,"").replace(",","."); else if((s.match(/\./g)||[]).length>1) s=s.replace(/\./g,"");
   const n=parseFloat(s); return isFinite(n)?n:null;
 }
+// valores em reais: "3.000" é três mil, "3.000,50" e "3000.5" também funcionam
+function parseMoney(v){ const t=String(v||"").trim().replace(/[R$\s]/g,""); if(/^\d{1,3}(\.\d{3})+$/.test(t)) return parseFloat(t.replace(/\./g,"")); return parseNum(t); }
 // feriados nacionais (fixos + Carnaval, Sexta-feira Santa e Corpus Christi)
 function easter(y){ const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mo=Math.floor((h+l-7*m+114)/31),da=((h+l-7*m+114)%31)+1; return new Date(y,mo-1,da); }
 const HC={};
@@ -1542,7 +1552,7 @@ const DEF={ini:nextMonthKey(), n:7, real:100, base:"du", hd:8, hm:168, reaj:6, v
 let S;
 function load(src){
   let v=src||null; if(!v){ try{ v=window.IMC_STATE || JSON.parse(localStorage.getItem(KEY)||"null"); }catch(e){} }
-  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})}; S.coll={...(S.coll||{})};
+  S={...DEF, ...(v||{})}; S.sel={...(S.sel||{})}; S.alloc={...(S.alloc||{})}; S.allocW={...(S.allocW||{})}; S.coll={...(S.coll||{})}; S.scales={...(S.scales||{})};
   if(S.view==="ano"){ S.view="mes"; S.yearMode=true; S.coll={}; }
   if(!Array.isArray(S.rows) || !S.rows.length) S.rows=ROLES.map(([id])=>({id, role:id, name:""}));
   S.rows=S.rows.filter(r=>ROLE[r.role]);
@@ -1683,6 +1693,13 @@ const MARKUP = `
     <div class="card-hd" style="margin-top:8px"><h3>Resumo por cargo</h3><span class="sub">Alocação média = horas ÷ horas disponíveis dos recursos no período</span></div>
     <div class="tbl" id="imcRoles"></div>
   </section>
+  <section class="card c12" aria-label="Scale rates">
+    <details id="imcScDet">
+      <summary>Scale rates (R$/hora, base abr/2026) <span class="sub" id="imcScNote"></span></summary>
+      <div class="tbl" style="margin-top:10px"><table class="sctbl" id="imcScTbl"></table></div>
+      <div class="proj-foot" style="margin-top:10px"><span>Os valores ficam salvos e passam a valer em toda a calculadora. O reajuste anual é aplicado sobre eles a cada abril.</span><button class="btn link danger" id="imcScReset" type="button">Restaurar scales padrão</button></div>
+    </details>
+  </section>
   <p class="source c12" id="imcMsg" role="status"></p>
 </div>`;
 
@@ -1726,7 +1743,7 @@ function render(){
     ? `<thead>${yearRow}<tr>${colHead}</tr></thead>`
     : `<thead><tr><th class="stk">Frente / cargo</th>${colHead}<th class="n">Total h</th><th class="n">Valor líquido</th></tr></thead>`;
   VROWS=[];
-  const roleOpts=`<option value="">+ Adicionar cargo</option>`+ROLES.map(([id,nm,sc])=>`<option value="${id}">${esc(nm)} · R$ ${NF(0).format(sc)}/h</option>`).join("");
+  const roleOpts=`<option value="">+ Adicionar cargo</option>`+ROLES.map(([id,nm])=>`<option value="${id}">${esc(nm)} · R$ ${NF(0).format(scaleOf(id))}/h</option>`).join("");
   const roleRow=row=>{
     const id=row.id, R=ROLE[row.role];
     VROWS.push(id);
@@ -1755,7 +1772,21 @@ function render(){
   g("imcTbl").innerHTML=head+`<tbody>${body}${emptyMsg}${foot}</tbody>`;
   g("imcTbl").classList.toggle("selmode",!!S.selMode);
   for(const k of [...SEL]){ const [r,i]=k.split("|"); if(!VROWS.includes(r) || +i>=COLS.length) SEL.delete(k); }
+  renderScales();
   paintSel(); recalc();
+}
+function renderScales(){
+  const g=id=>document.getElementById(id), ae=document.activeElement;
+  const changed=ROLES.filter(([id])=>scaleOf(id)!==DEFSC[id]).length;
+  g("imcScNote").textContent = changed ? `· ${changed} ${changed===1?"cargo alterado":"cargos alterados"}` : "· padrão Advisory/CMG";
+  if(ae && ae.closest && ae.closest("#imcScTbl")) return;
+  const M=months(); const yrs=[...new Set(M.map(o=>o.y))];
+  const steps=[]; const seen=new Set(); for(const o of M){ const c=cycles(o.y,o.m); if(!seen.has(c)){ seen.add(c); steps.push(o); } }
+  g("imcScTbl").innerHTML=`<thead><tr><th>Cargo</th><th class="n">Scale base (abr/26)</th><th class="n">Padrão</th>${steps.filter(o=>cycles(o.y,o.m)>0).map(o=>`<th class="n">a partir de ${mlabel(o.y,o.m)}</th>`).join("")}</tr></thead><tbody>
+    ${ROLES.map(([id,nm])=>{ const v=scaleOf(id), dif=v!==DEFSC[id]; return `<tr class="${dif?"scdif":""}"><td><div class="who">${esc(nm)}</div></td>
+      <td class="n"><div class="inp scinp"><span>R$</span><input data-sc="${id}" type="text" inputmode="decimal" value="${NF(2).format(v)}" aria-label="Scale base de ${esc(nm)}"></div></td>
+      <td class="n muted">${NF(0).format(DEFSC[id])}${dif?` <button class="btn link" data-scr="${id}" type="button">usar</button>`:""}</td>
+      ${steps.filter(o=>cycles(o.y,o.m)>0).map(o=>`<td class="n">${BRL.format(v*factor(o.y,o.m))}</td>`).join("")}</tr>`; }).join("")}</tbody>`;
 }
 function calc(){
   const cols=COLS.length?COLS:columns(); const Rz=S.real/100;
@@ -1795,7 +1826,7 @@ function recalc(){
   // resumo por cargo
   const cap100=c=> c.t==="w" ? c.days.length*S.hd : (c.t==="y" ? c.months.reduce((a,o)=>a+hoursMonth(o),0) : hoursMonth(c));
   const capRow=C.cols.reduce((a,c)=>a+cap100(c),0);
-  const byRole=ROLES.map(([rid,nm,sc])=>{ const rs=S.rows.filter(r=>r.role===rid).map(r=>C.rows[r.id]).filter(x=>x.h>0); const h=rs.reduce((a,x)=>a+x.h,0), vl=rs.reduce((a,x)=>a+x.vl,0); return {nm,sc,n:rs.length,h,vl,alloc: rs.length&&capRow? h/(rs.length*capRow):0}; }).filter(x=>x.n>0);
+  const byRole=ROLES.map(([rid,nm])=>{ const sc=scaleOf(rid); const rs=S.rows.filter(r=>r.role===rid).map(r=>C.rows[r.id]).filter(x=>x.h>0); const h=rs.reduce((a,x)=>a+x.h,0), vl=rs.reduce((a,x)=>a+x.vl,0); return {nm,sc,n:rs.length,h,vl,alloc: rs.length&&capRow? h/(rs.length*capRow):0}; }).filter(x=>x.n>0);
   const nRec=byRole.reduce((a,x)=>a+x.n,0);
   g("imcRoles").innerHTML = byRole.length ? `<table><thead><tr><th>Cargo</th><th class="n">Recursos</th><th class="n">Alocação média</th><th class="n">Horas</th><th class="n">Horas/mês</th><th class="n">Valor líquido</th><th class="n">Valor/mês</th><th class="n">% do valor</th></tr></thead><tbody>
     ${byRole.map(x=>`<tr><td><div class="who">${esc(x.nm)}</div><div class="lvl">R$ ${NF(0).format(x.sc)}/h base</div></td><td class="n">${x.n}</td><td class="n">${NF(1).format(x.alloc*100)}%</td><td class="n">${fh(x.h)}</td><td class="n">${fh(x.h/Math.max(1,S.n))}</td><td class="n">${BRL.format(x.vl)}</td><td class="n">${BRL.format(x.vl/Math.max(1,S.n))}</td><td class="n">${C.VL>0?NF(1).format(x.vl/C.VL*100):"0"}%</td></tr>`).join("")}
@@ -1829,7 +1860,7 @@ function summaryText(){
   const C=calc(); const M=months();
   const base = (S.view==="semana"||S.base!=="fixo") ? `horas pelos dias úteis × ${NF(2).format(S.hd)} h/dia` : `${NF(2).format(S.hm)} h/mês a 100%`;
   const L=[`Orçamento Advisory/CMG — ${mlabel(M[0].y,M[0].m)} a ${mlabel(M[M.length-1].y,M[M.length-1].m)} (${M.length} ${M.length===1?"mês":"meses"})`,
-    `Realização ${NF(2).format(S.real)}% · ${base} · reajuste ${NF(2).format(S.reaj)}% a.a. em abril (scales base abr/2026)${S.view==="semana"?" · alocação por semana":""}`, ""];
+    `Scales: ${ROLES.some(([id])=>scaleOf(id)!==DEFSC[id])?"personalizados":"padrão Advisory/CMG"} · Realização ${NF(2).format(S.real)}% · ${base} · reajuste ${NF(2).format(S.reaj)}% a.a. em abril (scales base abr/2026)${S.view==="semana"?" · alocação por semana":""}`, ""];
   for(const f of S.fronts){ const rs=frontRows(f.id).map(r=>C.rows[r.id]).filter(x=>x.h>0); if(!rs.length) continue;
     const fh2=rs.reduce((a,x)=>a+x.h,0), fv=rs.reduce((a,x)=>a+x.vl,0);
     L.push(`${f.name||"Frente"} — ${NF(1).format(fh2)} h · ${BRL.format(fv)}`);
@@ -1905,6 +1936,14 @@ function bind(){
     else if((e.key==="Delete"||e.key==="Backspace") && (!t.classList||!t.classList.contains("pin")||SEL.size>1)){ e.preventDefault(); applySel(""); }
     else if(/^[0-9]$/.test(e.key) && SEL.size>1){ e.preventDefault(); const v=g("imcSelVal"); v.value=e.key; v.focus(); }
   });
+  const scT=g("imcScTbl");
+  scT.addEventListener("change",e=>{ const el=e.target.closest("input[data-sc]"); if(!el) return; const v=parseMoney(el.value);
+    if(v==null || v<=0){ msg("Digite um valor por hora maior que zero."); renderScales(); return; }
+    S.scales[el.dataset.sc]=v; save(); el.blur(); render(); msg(`Scale de ${ROLE[el.dataset.sc].nm} salvo: R$ ${NF(2).format(v)}/h.`); });
+  scT.addEventListener("keydown",e=>{ if(e.key==="Enter" && e.target.matches("input[data-sc]")){ e.preventDefault(); e.target.dispatchEvent(new Event("change",{bubbles:true})); } });
+  scT.addEventListener("click",e=>{ const b=e.target.closest("button[data-scr]"); if(!b) return; delete S.scales[b.dataset.scr]; save(); render(); });
+  g("imcScReset").addEventListener("click",e=>{ const b=e.target; if(b.dataset.confirm){ S.scales={}; save(); render(); msg("Scales padrão restaurados."); delete b.dataset.confirm; b.textContent="Restaurar scales padrão"; return; }
+    b.dataset.confirm="1"; b.textContent="Confirmar restauração"; setTimeout(()=>{ if(b.isConnected){ delete b.dataset.confirm; b.textContent="Restaurar scales padrão"; } },4000); });
   const tbl=g("imcTbl");
   // arrastar com o mouse para selecionar um bloco; Shift+clique estende
   tbl.addEventListener("pointerdown",e=>{
